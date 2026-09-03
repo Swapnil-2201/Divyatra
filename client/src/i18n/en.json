@@ -1,0 +1,189 @@
+{
+  "nav": {
+    "home": "Home",
+    "temples": "Temples",
+    "planYatra": "Plan Yatra",
+    "liveDarshan": "Live Darshan",
+    "liveCrowd": "Live Crowd",
+    "bookDarshan": "Book Darshan",
+    "prasad": "Prasadam",
+    "myPasses": "My Passes",
+    "commandCenter": "Command Centre",
+    "pilgrimMode": "Pilgrim",
+    "authorityView": "Authority",
+    "searchPlaceholder": "Search temples, Aarti times, Dwarka, Somnath…",
+    "search": "Search"
+  },
+  "hero": {
+    "badge": "Gujarat's Official Pilgrimage Platform",
+    "headline": "A Safer, Smarter Journey to the Divine",
+    "headlineItalic": "to the Divine",
+    "subtitle": "Plan your pilgrimage, understand crowd conditions, book darshan, and stay connected throughout your journey.",
+    "ctaPlan": "Plan My Yatra",
+    "ctaExplore": "Explore Temples",
+    "trustLine": "Official Temple Information  •  Live Darshan  •  Smart Crowd Intelligence"
+  },
+  "liveStatus": {
+    "sectionLabel": "Live Pilgrimage Status",
+    "smooth": "Smooth",
+    "moderate": "Moderate",
+    "crowded": "Crowded",
+    "wait": "wait",
+    "viewDetails": "View details",
+    "aartiSoon": "Aarti soon",
+    "liveMonitored": "Live Monitored"
+  },
+  "temples": {
+    "sectionLabel": "Gujarat's Sacred Shrines",
+    "sectionHeading": "The Four Great Temples",
+    "sectionSub": "Real-time crowd tracking, Aarti schedules, and digital pass booking for Gujarat's holiest destinations.",
+    "viewAll": "View all temples",
+    "viewTemple": "View Temple",
+    "bookDarshan": "Book Darshan",
+    "donate": "E-Hundi / Donate",
+    "avgWait": "Avg. wait",
+    "nextAarti": "Next Aarti",
+    "crowdLevel": "Crowd",
+    "liveMonitored": "Live",
+    "capacity": "Daily capacity"
+  },
+  "howItWorks": {
+    "sectionLabel": "How DivYatra Works",
+    "sectionHeading": "Know before you go.",
+    "sectionSub": "Three pillars that help pilgrims and authorities stay ahead of the crowd.",
+    "p1Title": "Predict",
+    "p1Label": "01 — Predict",
+    "p1Body": "Crowd forecasting models show expected queue wait times hours in advance — so you can plan the right time to arrive.",
+    "p2Title": "Prevent",
+    "p2Label": "02 — Prevent",
+    "p2Body": "Dynamic slot quotas and rerouting suggestions keep sanctum corridors clear during surges and major festivals.",
+    "p3Title": "Protect",
+    "p3Label": "03 — Protect",
+    "p3Body": "Emergency response, QR-verified entry, senior citizen fast-tracks, and 24x7 paramedic teams across all four shrines."
+  },
+  "liveDarshan": {
+    "sectionLabel": "Official Live Darshan",
+    "sectionHeading": "Watch live from the sanctum.",
+    "sectionSub": "Connect to live darshan from official temple channels.",
+    "liveNow": "Live Now",
+    "unavailable": "Stream unavailable",
+    "unavailableDetail": "The live stream is not currently available in embedded mode.",
+    "watchOnYoutube": "Watch on Official YouTube Channel",
+    "openChannel": "Open Official Channel",
+    "sourceAttrib": "Source: Official Temple Channel",
+    "aartiToday": "Today's Aarti",
+    "embeddingBlocked": "Embedding is disabled for this stream.",
+    "tryDirectLink": "Open on YouTube"
+  },
+  "crowd": {
+    "sectionLabel": "Crowd Intelligence",
+    "sectionHeading": "Know the crowd before you arrive.",
+    "sectionSub": "Edge camera density tracking — updated every few seconds. No biometrics stored.",
+    "openHub": "Open Crowd Command Hub",
+    "activePilgrims": "Active pilgrims",
+    "avgWait": "Avg. wait",
+    "crowdLevel": "Crowd level",
+    "smooth": "Smooth flow",
+    "moderate": "Moderate",
+    "high": "High density",
+    "critical": "Critical"
+  },
+  "booking": {
+    "bookNow": "Book Darshan Pass",
+    "selectSlot": "Select a slot",
+    "pilgrimsCount": "Number of pilgrims",
+    "date": "Date",
+    "continue": "Continue to payment",
+    "free": "Free",
+    "vip": "VIP",
+    "slotsLeft": "slots left",
+    "confirmed": "Confirmed",
+    "downloadPass": "Download Pass",
+    "printPass": "Print Pass"
+  },
+  "prasad": {
+    "sectionLabel": "Sacred Prasadam",
+    "sectionHeading": "Order consecrated prasad.",
+    "sectionSub": "Pure Desi Ghee offerings prepared at the temple and delivered to your home or available for counter pickup.",
+    "addToCart": "Add to cart",
+    "counterPickup": "Counter Pickup",
+    "homeDelivery": "Home Delivery",
+    "cart": "Cart",
+    "orderNow": "Order Prasad"
+  },
+  "planner": {
+    "sectionLabel": "Plan Your Yatra",
+    "sectionHeading": "Build your itinerary.",
+    "sectionSub": "Tell us your dates and we'll suggest the best times to visit each shrine to avoid peak crowds.",
+    "startPlanning": "Start Planning",
+    "destination": "Destination",
+    "travelDate": "Travel date",
+    "generate": "Generate itinerary",
+    "generating": "Planning your yatra…"
+  },
+  "footer": {
+    "tagline": "Online Temple Bookings & Smart Pilgrimage",
+    "pilgrims": "For Pilgrims",
+    "authorities": "For Authorities",
+    "support": "Support & Safety",
+    "emergency": "Emergency: 112",
+    "copyright": "© 2024 DivYatra. An initiative for safer pilgrimage management in Gujarat.",
+    "privacy": "Privacy",
+    "terms": "Terms"
+  },
+  "common": {
+    "loading": "Loading…",
+    "error": "Something went wrong.",
+    "retry": "Try again",
+    "viewAll": "View all",
+    "learnMore": "Learn more",
+    "back": "Back",
+    "close": "Close",
+    "mins": "mins",
+    "hours": "hrs",
+    "free": "Free",
+    "liveTag": "LIVE"
+  },
+  "templeData": {
+    "somnath": {
+      "name": "Shree Somnath Jyotirlinga",
+      "shortName": "Somnath Temple",
+      "deity": "Lord Shiva (First of Twelve Jyotirlingas)",
+      "location": "Prabhas Patan, Veraval, Gujarat",
+      "tagline": "The Eternal Shrine by the Arabian Sea",
+      "description": "Somnath is revered as the first amongst the twelve holy Jyotirlinga shrines of Lord Shiva. Perched on the Arabian Sea coast, the temple stands as a glorious testament to faith, having been reconstructed in grand Chalukya architecture with intricate stone carvings, the sacred Banstambh, and a timeless spiritual aura.",
+      "historicalSignificance": "Mentioned in the Rigveda and Skanda Purana, Somnath is known as the 'Shrine Eternal'. The current grand Kailash Mahameru Prasad temple was reconstructed under the vision of Sardar Vallabhbhai Patel and inaugurated by Dr. Rajendra Prasad in 1951.",
+      "eveningAarti": "07:00 PM (Sandhya Maha Aarti)"
+    },
+    "dwarka": {
+      "name": "Shree Dwarkadhish Jagat Mandir",
+      "shortName": "Dwarkadhish (Jagat Mandir)",
+      "deity": "Lord Krishna (Dwarkanath / King of Dwarka)",
+      "location": "Dwarka, Devbhumi Dwarka, Gujarat",
+      "tagline": "The Sacred Kingdom of Dwarkadhish & Char Dham Shrine",
+      "description": "Dwarka is one of the foremost Char Dham pilgrimage destinations in Hinduism and a sacred Sapta Puri city. The grand Jagat Mandir rises with 72 intricately carved pillars and its iconic 52-yard sacred flag flying high above the confluence of the holy Gomti River and the Arabian Sea.",
+      "historicalSignificance": "Established over 2,500 years ago, Jagat Mandir is a magnificent 5-storied limestone structure with two sacred gateways — Swarga Dwar and Moksha Dwar.",
+      "eveningAarti": "07:30 PM (Sandhya Aarti)"
+    },
+    "ambaji": {
+      "name": "Shree Arasuri Ambaji Mata Temple",
+      "shortName": "Ambaji Shaktipeeth",
+      "deity": "Maa Amba (Principal 51 Shaktipeeth - Heart of Sati)",
+      "location": "Ambaji, Danta Taluka, Banaskantha, Gujarat",
+      "tagline": "Supreme Shaktipeeth of Gujarat on the Holy Arasur Hills",
+      "description": "Ambaji is one of the 51 holy Shaktipeeths, revered as the sacred place where the heart of Devi Sati fell. Nestled in the picturesque Arasur hills near Mount Abu border, it is a spiritual epicentre for millions of Shakti devotees.",
+      "historicalSignificance": "Uniquely, the temple enshrines the sacred Viso Yantra with no anthropomorphic idol, maintaining centuries of Vedic Tantric tradition.",
+      "eveningAarti": "07:00 PM (Sandhya Maha Aarti)"
+    },
+    "pavagadh": {
+      "name": "Shree Mahakali Mata Mandir, Pavagadh",
+      "shortName": "Pavagadh Mahakali Mandir",
+      "deity": "Maa Mahakali (Supreme Shaktipeeth & UNESCO Hill Complex)",
+      "location": "Pavagadh Hill, Champaner, Panchmahal, Gujarat",
+      "tagline": "The Sacred High-Altitude Cliff Peak of Champaner-Pavagadh",
+      "description": "Perched atop the dramatic 762-meter volcanic Pavagadh peak, this ancient Shaktipeeth is dedicated to Goddess Mahakali. Pilgrims ascend via traditional stone steps or the state-of-the-art Udan Khatola (ropeway).",
+      "historicalSignificance": "Dating back to the 10th-11th century, it is part of the UNESCO World Heritage Champaner-Pavagadh Archaeological Park, featuring a golden sanctum shikhara.",
+      "eveningAarti": "07:15 PM (Sandhya Aarti)"
+    }
+  }
+}

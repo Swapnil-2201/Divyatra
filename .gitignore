@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Environment files — NEVER commit these
+.env
+.env.local
+.env.production
+.env.staging
+client/.env
+client/.env.local
+server/.env
+server/.env.local
+AUTHORITY_SETUP.md
+
+# Build outputs & cache
+dist/
+client/dist/
+server/dist/
+.vite/
+client/.vite/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor
+.vscode/
+.idea/
+node_modules
+
+# Android build outputs & local config
+client/android/.gradle/
+client/android/app/build/
+client/android/build/
+client/android/local.properties
+client/android/.idea/
+client/android/captures/
+client/android/.externalNativeBuild/
+
+# Duplicate raw assets
+client/src/assets/Temple 3D models/

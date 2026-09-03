@@ -1,0 +1,29 @@
+{
+  "name": "divyatra",
+  "version": "1.0.0",
+  "description": "DivYatra - Intelligent Pilgrimage Management and Crowd Intelligence Platform",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "client": "cd client && npm run dev",
+    "server": "cd server && npm run dev",
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install",
+    "install:client": "cd client && npm install --legacy-peer-deps",
+    "build": "cd client && npm install --legacy-peer-deps && npm run build",
+    "start": "cd server && npm start"
+  },
+  "keywords": [
+    "pilgrimage",
+    "crowd-intelligence",
+    "somnath",
+    "dwarka",
+    "ambaji",
+    "pavagadh",
+    "temple-management"
+  ],
+  "author": "DivYatra Team",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

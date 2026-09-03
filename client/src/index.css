@@ -1,0 +1,163 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    max-width: 100%;
+    overflow-x: clip;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background-color: #F8F5EF;
+    color: #102A56;
+    max-width: 100%;
+    overflow-x: clip;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  h1, h2, h3 {
+    /* Headings use serif only when class is explicit — body defaults to Inter */
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+
+/* ─── Android & Mobile Safe Area Utilities ───────────────────── */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.safe-pb-margin {
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Touch & Horizontal Scroll Helpers */
+.touch-scroll {
+  -webkit-overflow-scrolling: touch;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F1ECE1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #C9B99A;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #E97820;
+}
+
+/* ─── Editorial Card ─────────────────────────────────────────── */
+.editorial-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(229, 222, 208, 0.7);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(16, 42, 86, 0.04);
+  transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+}
+
+.editorial-card:hover {
+  border-color: rgba(213, 166, 58, 0.4);
+  box-shadow: 0 8px 28px rgba(16, 42, 86, 0.1);
+  transform: translateY(-2px);
+}
+
+/* Legacy luxury-card alias kept for backward compat */
+.luxury-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(229, 222, 208, 0.8);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(16, 42, 86, 0.04);
+  transition: all 0.25s ease;
+}
+
+.luxury-card:hover {
+  border-color: rgba(233, 120, 32, 0.3);
+  box-shadow: 0 12px 32px rgba(16, 42, 86, 0.1);
+  transform: translateY(-2px);
+}
+
+/* ─── Animations ─────────────────────────────────────────────── */
+/* Hero image subtle slow scale */
+@keyframes hero-scale {
+  from { transform: scale(1.04); }
+  to   { transform: scale(1); }
+}
+.animate-hero-scale {
+  animation: hero-scale 8s ease-out forwards;
+}
+
+/* Fade up on scroll reveal */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+  animation: fade-up 0.6s ease-out forwards;
+}
+.animate-fade-up-delay-1 { animation-delay: 0.1s; opacity: 0; animation-fill-mode: forwards; animation-name: fade-up; animation-duration: 0.6s; }
+.animate-fade-up-delay-2 { animation-delay: 0.2s; opacity: 0; animation-fill-mode: forwards; animation-name: fade-up; animation-duration: 0.6s; }
+.animate-fade-up-delay-3 { animation-delay: 0.3s; opacity: 0; animation-fill-mode: forwards; animation-name: fade-up; animation-duration: 0.6s; }
+
+/* Gentle fade-in for panels */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-fadeIn {
+  animation: fadeIn 0.25s ease-out;
+}
+
+/* Live pulse indicator */
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.45; transform: scale(1.25); }
+}
+.animate-live-pulse {
+  animation: live-pulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ─── 3D Premise Viewer ──────────────────────────────────────── */
+.iso-grid {
+  perspective: 1200px;
+  transform-style: preserve-3d;
+}
+
+.iso-plane {
+  transform: rotateX(55deg) rotateZ(-35deg);
+  transition: transform 0.5s ease-out;
+}
+
+/* ─── Status colour tokens ───────────────────────────────────── */
+.status-smooth  { color: #16a34a; }
+.status-moderate { color: #d97706; }
+.status-crowded { color: #dc2626; }
+
+.status-bg-smooth   { background-color: #f0fdf4; border-color: #bbf7d0; }
+.status-bg-moderate { background-color: #fffbeb; border-color: #fde68a; }
+.status-bg-crowded  { background-color: #fef2f2; border-color: #fecaca; }

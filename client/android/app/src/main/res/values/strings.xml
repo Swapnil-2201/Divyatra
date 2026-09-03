@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">DivYatra</string>
+    <string name="title_activity_main">DivYatra</string>
+    <string name="package_name">com.divyatra.app</string>
+    <string name="custom_url_scheme">com.divyatra.app</string>
+</resources>

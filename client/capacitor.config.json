@@ -1,0 +1,8 @@
+{
+  "appId": "com.divyatra.app",
+  "appName": "DivYatra",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
