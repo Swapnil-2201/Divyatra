@@ -6,12 +6,12 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const rawUrl = (import.meta.env.VITE_SUPABASE_URL || 'https://gimolabmffytehwezcbh.supabase.co').trim();
-const rawKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_tpTNiUaP7XE1PWqfQLOmnA_bTgf3piT').trim();
+const rawUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
+const rawKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
 
 // Sanitize URL: remove quotes, ensure https protocol, strip /rest/v1 suffix
 const sanitizeUrl = (url) => {
-  if (!url) return '';
+  if (!url || url.includes('gimolabmffytehwezcbh')) return '';
   let clean = url.replace(/['"]/g, '').trim();
   if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
     clean = `https://${clean}`;

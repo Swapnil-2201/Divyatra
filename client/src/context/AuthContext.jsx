@@ -1,4 +1,4 @@
-﻿import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 import { api } from '../services/api';
 
@@ -116,26 +116,30 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     setLoading(true);
     try {
-      if (isSupabaseConfigured) {
+      if (isSupabaseConfigured && supabase) {
         // ── Supabase Auth ──────────────────────────────────────────────────
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw new Error(error.message);
+        try {
+          const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+          if (error) throw error;
 
-        const profile = await fetchProfile(data.user);
-        const userObj = buildUserObject(data.user, profile);
-        setUser(userObj);
-        setToken(data.session.access_token);
-        return { success: true, user: userObj };
-      } else {
-        // ── Mock Fallback (existing api.js logic) ──────────────────────────
-        const res = await api.login(email, password);
-        if (res?.token && res?.user) {
-          setToken(res.token);
-          setUser(res.user);
-          return { success: true, user: res.user };
+          const profile = await fetchProfile(data.user);
+          const userObj = buildUserObject(data.user, profile);
+          setUser(userObj);
+          setToken(data.session.access_token);
+          return { success: true, user: userObj };
+        } catch (supaErr) {
+          console.warn('[Auth] Supabase auth unavailable, falling back to local auth:', supaErr.message);
         }
-        throw new Error(res?.message || 'Login failed');
       }
+
+      // ── Local / API Gateway Fallback ──────────────────────────────────
+      const res = await api.login(email, password);
+      if (res?.token && res?.user) {
+        setToken(res.token);
+        setUser(res.user);
+        return { success: true, user: res.user };
+      }
+      throw new Error(res?.message || 'Login failed');
     } catch (err) {
       return { success: false, error: err.message };
     } finally {
@@ -147,37 +151,39 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     setLoading(true);
     try {
-      if (isSupabaseConfigured) {
+      if (isSupabaseConfigured && supabase) {
         // ── Supabase Auth signup ───────────────────────────────────────────
-        const { data, error } = await supabase.auth.signUp({
-          email:    userData.email,
-          password: userData.password,
-          options: {
-            data: {
-              full_name: userData.name,
-              role:      'devotee',            // new accounts are always devotees
+        try {
+          const { data, error } = await supabase.auth.signUp({
+            email:    userData.email,
+            password: userData.password,
+            options: {
+              data: {
+                full_name: userData.name,
+                role:      'devotee',
+              },
             },
-          },
-        });
-        if (error) throw new Error(error.message);
+          });
+          if (error) throw error;
 
-        // Profile row is auto-created by the DB trigger (handle_new_user)
-        // Fetch it so we can populate the user object properly
-        const profile = await fetchProfile(data.user);
-        const userObj = buildUserObject(data.user, profile);
-        setUser(userObj);
-        setToken(data.session?.access_token ?? null);
-        return { success: true, user: userObj };
-      } else {
-        // ── Mock Fallback ──────────────────────────────────────────────────
-        const res = await api.register(userData);
-        if (res?.token && res?.user) {
-          setToken(res.token);
-          setUser(res.user);
-          return { success: true, user: res.user };
+          const profile = await fetchProfile(data.user);
+          const userObj = buildUserObject(data.user, profile);
+          setUser(userObj);
+          setToken(data.session?.access_token ?? null);
+          return { success: true, user: userObj };
+        } catch (supaErr) {
+          console.warn('[Auth] Supabase signup unavailable, falling back to local auth:', supaErr.message);
         }
-        throw new Error(res?.message || 'Registration failed');
       }
+
+      // ── Local / API Gateway Fallback ──────────────────────────────────
+      const res = await api.register(userData);
+      if (res?.token && res?.user) {
+        setToken(res.token);
+        setUser(res.user);
+        return { success: true, user: res.user };
+      }
+      throw new Error(res?.message || 'Registration failed');
     } catch (err) {
       return { success: false, error: err.message };
     } finally {
