@@ -125,7 +125,7 @@ export const LiveCrowdPage = () => {
 
           <MetricCard
             title="System Alert Status"
-            value={crowdData?.systemAlertLevel || "ELEVATED_WATCH"}
+            value={crowdData?.systemAlertLevel ? crowdData.systemAlertLevel.replace(/_/g, ' ') : "Elevated Watch"}
             subtitle="Active congestion surveillance"
             icon={ShieldCheck}
             color="white"
