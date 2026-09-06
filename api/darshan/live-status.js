@@ -1,12 +1,18 @@
 /**
  * Vercel Serverless Function: GET /api/darshan/live-status
  * 
- * Automatically detects current active live stream for temple channels.
- * Supports:
- * 1. Official YouTube Data API v3 (when YOUTUBE_API_KEY / GOOGLE_API_KEY is configured in Vercel env)
- * 2. High-reliability Direct Channel /live scrape with consent headers
- * 3. Channel RSS feed multi-candidate live validation
- * 4. Active verified fallback to maintain continuity during cloud datacenter challenges
+ * Accurately detects active YouTube live streams for temple channels.
+ * 
+ * Pipeline:
+ * 1. Official YouTube Data API v3 (if apiKey configured)
+ * 2. Channel /streams tab scan (parses active "LIVE" badges vs "Upcoming" vs ended)
+ * 3. Direct /live URL resolution with strict playability and isLiveNow verification
+ * 4. Channel RSS feed multi-candidate verification
+ * 
+ * Distinguishes strictly between:
+ * - Active live streams (isLiveNow === true, playabilityStatus === 'OK')
+ * - Upcoming scheduled events (isUpcoming === true, playabilityStatus === 'LIVE_STREAM_OFFLINE')
+ * - Ended / recorded streams
  */
 
 const CHANNELS = {
@@ -14,29 +20,25 @@ const CHANNELS = {
     channelId: 'UCT1egsvA08YcdMLiEu1DTRg',
     handle: '@SomnathTempleOfficialChannel',
     name: 'Shree Somnath Jyotirlinga',
-    defaultTitle: '🔴 Live Darshan - Shree Somnath Temple, First Jyotirlinga',
-    verifiedActiveVideoId: 'iwRJs3r6Bkw',
+    defaultTitle: 'Live Darshan — Shree Somnath Jyotirlinga',
   },
   dwarka: {
     channelId: 'UCBAvMHZO3BIfMMhOK9LMOYQ',
     handle: '@shridwarkadhishmandirofficial',
     name: 'Shree Dwarkadhish Jagat Mandir',
     defaultTitle: 'Live Darshan — Shree Dwarkadhish Jagat Mandir',
-    verifiedActiveVideoId: '-tDZtep30Ec',
   },
   ambaji: {
     channelId: 'UCUge9PCf1By7w1DEP95xXoA',
     handle: '@officialambajitemple',
     name: 'Shree Arasuri Ambaji Mata Temple',
     defaultTitle: 'Live Darshan — Shree Arasuri Ambaji Mata Temple',
-    verifiedActiveVideoId: null,
   },
   pavagadh: {
     channelId: '',
     handle: '',
     name: 'Shree Mahakali Mata Mandir, Pavagadh',
     defaultTitle: 'Live Darshan — Pavagadh Mahakali Mandir',
-    verifiedActiveVideoId: null,
   },
 };
 
@@ -53,13 +55,61 @@ let cache = {
 };
 const CACHE_TTL_MS = 60 * 1000;
 
+/**
+ * Validates whether a specific YouTube videoId is ACTUALLY streaming live right now.
+ * Rejects upcoming scheduled broadcasts, ended streams, and offline videos.
+ */
+async function verifyVideoIsLive(videoId) {
+  if (!videoId || typeof videoId !== 'string' || videoId.length !== 11) {
+    return { isLive: false };
+  }
+  try {
+    const res = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+      headers: YOUTUBE_HEADERS,
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return { isLive: false };
+
+    const html = await res.text();
+    const pm = html.match(/ytInitialPlayerResponse\s*=\s*({.+?});/s);
+    if (!pm) return { isLive: false };
+
+    const p = JSON.parse(pm[1]);
+    const details = p.videoDetails;
+    const playability = p.playabilityStatus;
+    const liveDetails = p.microformat?.playerMicroformatRenderer?.liveBroadcastDetails;
+
+    // Reject if scheduled upcoming or playability is offline/error
+    if (details?.isUpcoming || playability?.status !== 'OK') {
+      return { isLive: false, reason: 'upcoming_or_offline' };
+    }
+
+    // If liveBroadcastDetails is present, check isLiveNow
+    if (liveDetails && liveDetails.isLiveNow === false) {
+      return { isLive: false, reason: 'broadcast_ended_or_future' };
+    }
+
+    // Must be actively live
+    const isLive = Boolean(details?.isLive || liveDetails?.isLiveNow === true);
+    return {
+      isLive,
+      videoId,
+      title: details?.title || null,
+    };
+  } catch (e) {
+    return { isLive: false, error: e.message };
+  }
+}
+
 async function checkYouTubeChannelLive(channelInfo) {
-  const { channelId, handle, verifiedActiveVideoId } = channelInfo || {};
+  const { channelId, handle, name, defaultTitle } = channelInfo || {};
   if (!channelId && !handle) {
     return { isLive: false, videoId: null, streamTitle: null, status: 'offline' };
   }
 
-  // Tier 1: YouTube Data API v3 (if key provisioned in Vercel / process.env)
+  // -----------------------------------------------------------------
+  // Tier 1: Official YouTube Data API v3 (if key configured)
+  // -----------------------------------------------------------------
   const apiKey = process.env.YOUTUBE_API_KEY || process.env.GOOGLE_API_KEY || process.env.VITE_YOUTUBE_API_KEY;
   if (apiKey && channelId) {
     try {
@@ -69,144 +119,172 @@ async function checkYouTubeChannelLive(channelInfo) {
         const apiData = await apiRes.json();
         if (apiData.items && apiData.items.length > 0) {
           const item = apiData.items[0];
-          const videoId = item.id?.videoId;
-          const streamTitle = item.snippet?.title;
-          if (videoId) {
-            return {
-              isLive: true,
-              videoId,
-              streamTitle: streamTitle || channelInfo.defaultTitle,
-              status: 'live',
-            };
+          const candidateId = item.id?.videoId;
+          if (candidateId) {
+            const check = await verifyVideoIsLive(candidateId);
+            if (check.isLive) {
+              return {
+                isLive: true,
+                videoId: candidateId,
+                streamTitle: check.title || item.snippet?.title || defaultTitle,
+                status: 'live',
+              };
+            }
           }
-        } else {
-          return { isLive: false, videoId: null, streamTitle: null, status: 'offline' };
         }
       }
     } catch (apiErr) {
-      console.warn(`[YouTube Data API] Query note:`, apiErr.message);
+      console.warn(`[YouTube Data API] Search note for ${name}:`, apiErr.message);
     }
   }
 
-  // Tier 2: Channel RSS Feed Multi-Candidate Scan (High reliability across cloud IPs)
-  if (channelId) {
+  // -----------------------------------------------------------------
+  // Tier 2: Channel /streams tab scan (Most reliable across all cloud IPs)
+  // -----------------------------------------------------------------
+  const streamsUrls = [];
+  if (handle) streamsUrls.push(`https://www.youtube.com/${handle.startsWith('@') ? handle : '@' + handle}/streams`);
+  if (channelId) streamsUrls.push(`https://www.youtube.com/channel/${channelId}/streams`);
+
+  for (const sUrl of streamsUrls) {
     try {
-      const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
-      const rssRes = await fetch(rssUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0' },
-        signal: AbortSignal.timeout(6000),
-      });
-      if (rssRes.ok) {
-        const xml = await rssRes.text();
-        const videoMatches = [...xml.matchAll(/<yt:videoId>([a-zA-Z0-9_-]{11})<\/yt:videoId>/g)].map(m => m[1]);
-        
-        // Scan top 5 candidates from the feed
-        const candidates = videoMatches.slice(0, 5);
-        for (const candidateId of candidates) {
-          try {
-            const watchRes = await fetch(`https://www.youtube.com/watch?v=${candidateId}`, {
-              headers: YOUTUBE_HEADERS,
-              signal: AbortSignal.timeout(5000),
-            });
-            if (watchRes.ok) {
-              const watchHtml = await watchRes.text();
-              const isCandidateLive =
-                (watchHtml.includes('"isLive":true') || watchHtml.includes('"isLiveBroadcast":true')) &&
-                !watchHtml.includes('Streamed live');
-              if (isCandidateLive) {
-                const titleMatch = watchHtml.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i);
-                return {
-                  isLive: true,
-                  videoId: candidateId,
-                  streamTitle: titleMatch ? titleMatch[1] : channelInfo.defaultTitle,
-                  status: 'live',
-                };
+      const res = await fetch(sUrl, { headers: YOUTUBE_HEADERS, signal: AbortSignal.timeout(6000) });
+      if (!res.ok) continue;
+
+      const html = await res.text();
+      const m = html.match(/ytInitialData\s*=\s*({.+?});/);
+      if (m) {
+        const data = JSON.parse(m[1]);
+        const tab = data?.contents?.twoColumnBrowseResultsRenderer?.tabs?.find(
+          (t) => t.tabRenderer?.title === 'Live' || t.tabRenderer?.title === 'Streams'
+        );
+        const richGrid = tab?.tabRenderer?.content?.richGridRenderer;
+        if (richGrid?.contents) {
+          for (const item of richGrid.contents) {
+            // Check lockupViewModel (modern YouTube layout)
+            const vm = item.richItemRenderer?.content?.lockupViewModel;
+            if (vm && vm.contentId) {
+              const overlays = vm.contentImage?.thumbnailViewModel?.overlays || [];
+              const badges = overlays[0]?.thumbnailBottomOverlayViewModel?.badges || [];
+              const badgeText = badges[0]?.thumbnailBadgeViewModel?.text;
+              const badgeStyle = badges[0]?.thumbnailBadgeViewModel?.badgeStyle;
+              const isLiveBadge = badgeText === 'LIVE' || badgeStyle === 'THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE';
+
+              if (isLiveBadge) {
+                const title = vm.metadata?.lockupMetadataViewModel?.title?.content;
+                const check = await verifyVideoIsLive(vm.contentId);
+                if (check.isLive) {
+                  return {
+                    isLive: true,
+                    videoId: vm.contentId,
+                    streamTitle: check.title || title || defaultTitle,
+                    status: 'live',
+                  };
+                }
               }
             }
-          } catch (e) {
-            // Next candidate
+
+            // Check videoRenderer (classic YouTube layout)
+            const vr = item.videoRenderer || item.richItemRenderer?.content?.videoRenderer;
+            if (vr && vr.videoId) {
+              const vrBadges = vr.badges || [];
+              const hasLiveBadge = vrBadges.some(
+                (b) => b.metadataBadgeRenderer?.style === 'BADGE_STYLE_TYPE_LIVE_NOW' || b.metadataBadgeRenderer?.label === 'LIVE'
+              );
+              if (hasLiveBadge) {
+                const title = vr.title?.runs?.[0]?.text;
+                const check = await verifyVideoIsLive(vr.videoId);
+                if (check.isLive) {
+                  return {
+                    isLive: true,
+                    videoId: vr.videoId,
+                    streamTitle: check.title || title || defaultTitle,
+                    status: 'live',
+                  };
+                }
+              }
+            }
           }
         }
       }
-    } catch (rssErr) {
-      // Fall through to Direct Scrape
+    } catch (streamsErr) {
+      // Fall through to next candidate
     }
   }
 
-  // Tier 3: Direct Channel Live Scrape
-  const urlsToTry = [];
-  if (channelId) urlsToTry.push(`https://www.youtube.com/channel/${channelId}/live`);
-  if (handle) urlsToTry.push(`https://www.youtube.com/${handle.startsWith('@') ? handle : '@' + handle}/live`);
+  // -----------------------------------------------------------------
+  // Tier 3: Direct Channel /live URL Resolution
+  // -----------------------------------------------------------------
+  const liveUrls = [];
+  if (handle) liveUrls.push(`https://www.youtube.com/${handle.startsWith('@') ? handle : '@' + handle}/live`);
+  if (channelId) liveUrls.push(`https://www.youtube.com/channel/${channelId}/live`);
 
-  for (const liveUrl of urlsToTry) {
+  for (const liveUrl of liveUrls) {
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 7000);
-
       const response = await fetch(liveUrl, {
         headers: YOUTUBE_HEADERS,
         redirect: 'follow',
-        signal: controller.signal,
+        signal: AbortSignal.timeout(7000),
       });
-      clearTimeout(timeout);
 
       if (response.ok) {
         const html = await response.text();
-        let videoId = null;
-        let streamTitle = null;
-        let isLive = false;
-
         const canonicalMatch =
           html.match(/<link\s+rel="canonical"\s+href="([^"]+)"/i) ||
           html.match(/<link\s+href="([^"]+)"\s+rel="canonical"/i);
         const ogUrlMatch = html.match(/<meta\s+property="og:url"\s+content="([^"]+)"/i);
         const urlCandidate = canonicalMatch?.[1] || ogUrlMatch?.[1] || '';
 
-        const vMatch = urlCandidate.match(/watch\?v=([a-zA-Z0-9_-]{11})/) || urlCandidate.match(/\/live\/([a-zA-Z0-9_-]{11})/);
-        if (vMatch) videoId = vMatch[1];
+        const vMatch =
+          urlCandidate.match(/watch\?v=([a-zA-Z0-9_-]{11})/) ||
+          urlCandidate.match(/\/live\/([a-zA-Z0-9_-]{11})/);
 
-        const ogTitle = html.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i);
-        if (ogTitle) streamTitle = ogTitle[1];
-
-        const playerMatch = html.match(/ytInitialPlayerResponse\s*=\s*({.+?});/s);
-        if (playerMatch) {
-          try {
-            const pdata = JSON.parse(playerMatch[1]);
-            if (pdata.videoDetails?.videoId) videoId = pdata.videoDetails.videoId;
-            if (pdata.videoDetails?.title) streamTitle = pdata.videoDetails.title;
-            if ((pdata.videoDetails?.isLive || pdata.videoDetails?.isLiveContent) && pdata.playabilityStatus?.status === 'OK') {
-              isLive = true;
-            }
-          } catch (e) {}
-        }
-
-        if (!isLive && videoId) {
-          const hasLiveText = html.includes('"isLive":true') || html.includes('"isLiveBroadcast":true');
-          const isEnded = html.includes('Streamed live') && !html.includes('"isLive":true');
-          if (hasLiveText && !isEnded) isLive = true;
-        }
-
-        if (isLive && videoId) {
-          return {
-            isLive: true,
-            videoId,
-            streamTitle: streamTitle || channelInfo.defaultTitle,
-            status: 'live',
-          };
+        if (vMatch) {
+          const candidateId = vMatch[1];
+          const check = await verifyVideoIsLive(candidateId);
+          if (check.isLive) {
+            return {
+              isLive: true,
+              videoId: candidateId,
+              streamTitle: check.title || defaultTitle,
+              status: 'live',
+            };
+          }
         }
       }
-    } catch (e) {}
+    } catch (liveErr) {
+      // Next candidate
+    }
   }
 
-  // Tier 4: Verified Active Ongoing Stream Fallback
-  // If cloud IP is challenged by YouTube bot check, maintain continuity for active temples
-  if (verifiedActiveVideoId) {
-    return {
-      isLive: true,
-      videoId: verifiedActiveVideoId,
-      streamTitle: channelInfo.defaultTitle,
-      status: 'live',
-    };
+  // -----------------------------------------------------------------
+  // Tier 4: Channel RSS Feed Candidate Scan
+  // -----------------------------------------------------------------
+  if (channelId) {
+    try {
+      const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
+      const rssRes = await fetch(rssUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (rssRes.ok) {
+        const xml = await rssRes.text();
+        const videoMatches = [...xml.matchAll(/<yt:videoId>([a-zA-Z0-9_-]{11})<\/yt:videoId>/g)].map((m) => m[1]);
+        const topCandidates = videoMatches.slice(0, 3);
+        for (const candidateId of topCandidates) {
+          const check = await verifyVideoIsLive(candidateId);
+          if (check.isLive) {
+            return {
+              isLive: true,
+              videoId: candidateId,
+              streamTitle: check.title || defaultTitle,
+              status: 'live',
+            };
+          }
+        }
+      }
+    } catch (rssErr) {
+      // Final fallback to offline
+    }
   }
 
   return { isLive: false, videoId: null, streamTitle: null, status: 'offline' };
@@ -225,7 +303,7 @@ export default async function handler(req, res) {
   const now = Date.now();
 
   if (!forceRefresh && cache.data && now - cache.timestamp < CACHE_TTL_MS) {
-    res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
+    res.setHeader('Cache-Control', 'public, max-age=30, s-maxage=30, stale-while-revalidate=60');
     return res.status(200).json({
       success: true,
       cached: true,
@@ -275,7 +353,7 @@ export default async function handler(req, res) {
       data: results,
     };
 
-    res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
+    res.setHeader('Cache-Control', 'public, max-age=30, s-maxage=30, stale-while-revalidate=60');
     return res.status(200).json({
       success: true,
       cached: false,

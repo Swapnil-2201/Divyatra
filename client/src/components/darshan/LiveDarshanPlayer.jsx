@@ -280,7 +280,7 @@ export const LiveDarshanPlayer = ({ initialTemple = 'somnath', compact = false }
                 className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg bg-[#102A56] text-white text-xs sm:text-sm font-semibold hover:bg-[#1B3B74] transition-colors shadow-sm min-h-[40px]"
               >
                 <ExternalLink className="w-4 h-4" />
-                <span>Visit Official Channel</span>
+                <span>Open Official Channel</span>
               </a>
             </div>
           </div>
