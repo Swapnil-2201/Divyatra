@@ -4,6 +4,8 @@ import {
   registerBand,
   acknowledgePass,
   triggerEmergency,
+  clearEmergency,
+  authorityPushEmergency,
   getBandEvents,
   getAllBands,
   resetBand,
@@ -23,6 +25,12 @@ router.post("/band/:bandId/acknowledge", acknowledgePass);
 
 // Dispatch emergency SOS from smart band
 router.post("/band/:bandId/emergency", triggerEmergency);
+
+// Clear and silence emergency alert on smart band
+router.post("/band/:bandId/emergency/clear", clearEmergency);
+
+// Push emergency alert from Temple Authority to smart band
+router.post("/band/:bandId/emergency/authority-push", authorityPushEmergency);
 
 // Retrieve band event timeline
 router.get("/band/:bandId/events", getBandEvents);

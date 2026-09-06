@@ -28,6 +28,8 @@ export const BandProvider = ({ children }) => {
   // Refs to avoid stale closures in polling intervals
   const currentPassRef = useRef(currentPass);
   const emergencyActiveRef = useRef(false);
+  // Track silenced incident IDs to prevent polling resurgence
+  const silencedIncidentsRef = useRef(new Set());
 
   useEffect(() => {
     currentPassRef.current = currentPass;
@@ -200,12 +202,24 @@ export const BandProvider = ({ children }) => {
       }
 
       if (state.emergencyStatus) {
-        if (state.emergencyStatus.active && !emergencyActiveRef.current) {
+        const emg = state.emergencyStatus;
+        const incidentId = emg.incidentId || emg.timestamp || 'active-incident';
+        const isAuthority = Boolean(
+          emg.source === 'AUTHORITY' ||
+          emg.source === 'ADMIN' ||
+          emg.isAuthorityPush ||
+          emg.pushedBy
+        );
+        const alreadySilenced = silencedIncidentsRef.current.has(incidentId);
+
+        // ONLY show this emergency notification when Admin/temple authority user pushed it AND not already silenced
+        if (emg.active && isAuthority && !alreadySilenced && !emergencyActiveRef.current) {
+          console.log('🚨 [Emergency] Received authorized Temple Authority Emergency Push:', emg);
           setEmergencyActive(true);
-          setEmergencyData(state.emergencyStatus);
+          setEmergencyData(emg);
           setActiveScreen('sos');
           triggerHaptic();
-        } else if (!state.emergencyStatus.active && emergencyActiveRef.current) {
+        } else if (!emg.active && emergencyActiveRef.current) {
           setEmergencyActive(false);
           setEmergencyData(null);
         }
@@ -289,9 +303,29 @@ export const BandProvider = ({ children }) => {
         }
       },
       onEmergencyAlert: (emg) => {
-        triggerHaptic();
-        setEmergencyActive(true);
-        setEmergencyData(emg);
+        const incidentId = emg.incidentId || emg.timestamp || 'active-incident';
+        const isAuthority = Boolean(
+          emg.source === 'AUTHORITY' ||
+          emg.source === 'ADMIN' ||
+          emg.isAuthorityPush ||
+          emg.pushedBy
+        );
+        const alreadySilenced = silencedIncidentsRef.current.has(incidentId);
+
+        // ONLY show emergency notification when pushed by Admin/temple authority and not silenced
+        if (isAuthority && !alreadySilenced) {
+          triggerHaptic();
+          setEmergencyActive(true);
+          setEmergencyData(emg);
+          setActiveScreen('sos');
+        } else {
+          console.log('ℹ️ [IoT Mesh] Emergency event ignored (not an authority push or already silenced):', emg);
+        }
+      },
+      onEmergencyCleared: () => {
+        setEmergencyActive(false);
+        setEmergencyData(null);
+        setActiveScreen('clock');
       },
       onBandReset: () => {
         setCurrentPass(null);
@@ -299,6 +333,7 @@ export const BandProvider = ({ children }) => {
         setIsNewPassAlert(false);
         setEmergencyActive(false);
         setEmergencyData(null);
+        silencedIncidentsRef.current.clear();
         setActiveScreen('clock');
         syncLatestState();
       },
@@ -462,9 +497,43 @@ export const BandProvider = ({ children }) => {
     await iotApi.simulateEvent(bandId, 'HEALTH_ALERT');
   };
 
+  // Silence and acknowledge emergency alert (prevents polling resurgence)
+  const silenceEmergency = useCallback(async () => {
+    const incId = emergencyData?.incidentId || emergencyData?.timestamp || 'active-incident';
+    if (incId) {
+      silencedIncidentsRef.current.add(incId);
+    }
+    setEmergencyActive(false);
+    setEmergencyData(null);
+    setActiveScreen('clock');
+
+    try {
+      await iotApi.silenceEmergency(bandId);
+    } catch (e) {
+      console.warn('⚠️ Silence emergency sync notice:', e.message);
+    }
+  }, [bandId, emergencyData]);
+
   const simulateEmergency = async () => {
     triggerHaptic();
-    await triggerEmergencySOS('DEMO_EMERGENCY', 'Simulated emergency alert from demo control panel');
+    const incId = `EMG-AUTH-${Date.now().toString(36).toUpperCase()}`;
+    const payload = {
+      type: 'AUTHORITY_EMERGENCY',
+      source: 'AUTHORITY',
+      pushedBy: 'Temple Authority HQ',
+      details: '⚠ CRITICAL ADVISORY: Temple Authority has pushed an emergency alert to all connected smart bands.',
+      pilgrim: currentPilgrim,
+      location: `${location.templeName} - ${location.gate}`,
+      timestamp: new Date().toISOString(),
+      incidentId: incId,
+      isAuthorityPush: true,
+    };
+    // Ensure this new incident is not blocked by old silences
+    silencedIncidentsRef.current.delete(incId);
+    setEmergencyActive(true);
+    setEmergencyData(payload);
+    setActiveScreen('sos');
+    await iotApi.triggerEmergency(bandId, payload);
   };
 
   return (
@@ -490,6 +559,7 @@ export const BandProvider = ({ children }) => {
         emergencyActive,
         setEmergencyActive,
         emergencyData,
+        silenceEmergency,
         activeScreen,
         setActiveScreen,
         selectedPassModal,

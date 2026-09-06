@@ -5,7 +5,7 @@ import { ShieldAlert, AlertTriangle, X, Radio, Clock, MapPin, User } from 'lucid
 export const EmergencyModal = () => {
   const {
     emergencyActive,
-    setEmergencyActive,
+    silenceEmergency,
     emergencyData,
     bandId,
     currentPilgrim,
@@ -19,6 +19,8 @@ export const EmergencyModal = () => {
   const timestamp = emergencyData?.timestamp
     ? new Date(emergencyData.timestamp).toLocaleTimeString()
     : new Date().toLocaleTimeString();
+  const pushedBy = emergencyData?.pushedBy || 'Temple Authority Central Command';
+  const alertDetails = emergencyData?.details || 'Official security and emergency assistance notice dispatched to device.';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
@@ -34,18 +36,30 @@ export const EmergencyModal = () => {
               <h3 className="font-serif text-base sm:text-lg font-black text-red-400 tracking-wide">
                 ⚠ EMERGENCY ASSISTANCE REQUESTED
               </h3>
-              <span className="text-[10px] font-mono text-slate-400">
-                DivYatra Security Mesh Dispatched
+              <span className="text-[10px] font-mono text-amber-400 font-semibold block">
+                🏛️ Temple Authority Official Push Broadcast
               </span>
             </div>
           </div>
 
           <button
-            onClick={() => setEmergencyActive(false)}
+            onClick={() => silenceEmergency()}
             className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            title="Silence and Close Alert"
           >
             <X className="w-5 h-5" />
           </button>
+        </div>
+
+        {/* Authority Origin Badge */}
+        <div className="bg-red-950/50 rounded-xl p-3 border border-red-500/30 space-y-1">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-slate-400">Authority Issuer:</span>
+            <strong className="text-white font-bold">{pushedBy}</strong>
+          </div>
+          <p className="text-[11px] text-red-200 leading-relaxed pt-0.5 border-t border-red-900/40">
+            {alertDetails}
+          </p>
         </div>
 
         {/* Incident Summary Card */}
@@ -91,7 +105,7 @@ export const EmergencyModal = () => {
 
         {/* Close Button */}
         <button
-          onClick={() => setEmergencyActive(false)}
+          onClick={() => silenceEmergency()}
           className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs tracking-wider transition-colors"
         >
           Acknowledge & Silence Alert

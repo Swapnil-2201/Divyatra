@@ -17,6 +17,7 @@ export const DemoControls = () => {
     simulateCrowdAlert,
     simulateHealthAlert,
     simulateEmergency,
+    silenceEmergency,
     resetBandDevice,
   } = useBand();
 
@@ -95,21 +96,35 @@ export const DemoControls = () => {
           </div>
         </button>
 
-        {/* 4. Simulate Emergency */}
+        {/* 4. Simulate Authority Emergency Push */}
         <button
-          onClick={() => handleAction('Emergency SOS', simulateEmergency)}
+          onClick={() => handleAction('Authority Emergency Push', simulateEmergency)}
           className="flex items-center gap-2.5 p-3 rounded-xl bg-red-950/40 hover:bg-red-900/40 border border-red-800/40 hover:border-red-500 text-red-200 font-semibold transition-all group text-left min-h-[44px]"
         >
           <div className="w-7 h-7 rounded-lg bg-red-500/20 flex items-center justify-center text-red-400 group-hover:scale-110 transition-transform shrink-0">
             <ShieldAlert className="w-4 h-4" />
           </div>
           <div>
-            <span className="block font-bold text-white text-[11px]">Simulate Emergency</span>
-            <span className="text-[9.5px] text-red-300 font-normal">Dispatch SOS to authority</span>
+            <span className="block font-bold text-white text-[11px]">Push Authority Emergency</span>
+            <span className="text-[9.5px] text-red-300 font-normal">Simulate Temple Authority push</span>
           </div>
         </button>
 
-        {/* 5. Reset Device */}
+        {/* 5. Silence / Clear Emergency */}
+        <button
+          onClick={() => handleAction('Emergency Silenced', silenceEmergency)}
+          className="flex items-center gap-2.5 p-3 rounded-xl bg-emerald-950/30 hover:bg-emerald-900/40 border border-emerald-800/30 hover:border-emerald-500 text-emerald-200 font-semibold transition-all group text-left min-h-[44px]"
+        >
+          <div className="w-7 h-7 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform shrink-0">
+            <CheckCircle2 className="w-4 h-4" />
+          </div>
+          <div>
+            <span className="block font-bold text-white text-[11px]">Silence / Clear Alert</span>
+            <span className="text-[9.5px] text-emerald-300/80 font-normal">Dismiss emergency beacon</span>
+          </div>
+        </button>
+
+        {/* 6. Reset Device */}
         <button
           onClick={() => handleAction('Device Reset', resetBandDevice)}
           className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-slate-600 text-slate-200 font-semibold transition-all group text-left min-h-[44px]"

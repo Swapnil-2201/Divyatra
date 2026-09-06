@@ -133,6 +133,24 @@ export const iotApi = {
   },
 
   /**
+   * Silence and clear active emergency on smart band
+   */
+  async silenceEmergency(bandId = 'DV-BAND-0001') {
+    try {
+      const res = await fetch(`${getGatewayUrl()}/iot/band/${bandId}/emergency/clear`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const json = await res.json();
+      return json;
+    } catch (err) {
+      console.warn('⚠️ [API] Silence emergency fallback:', err.message);
+      return { success: true };
+    }
+  },
+
+  /**
    * Retrieve band event timeline
    */
   async getBandEvents(bandId = 'DV-BAND-0001') {

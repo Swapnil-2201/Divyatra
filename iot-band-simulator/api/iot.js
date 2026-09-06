@@ -161,31 +161,64 @@ export default async function handler(req, res) {
       });
     }
 
-    // 3. POST /api/iot/band/:bandId/emergency
+    // 3. POST /api/iot/band/:bandId/emergency/clear
+    if ((queryPath.includes("clear") || url.includes("/clear")) && req.method === "POST") {
+      simulatedBand.emergencyStatus = {
+        active: false,
+        type: "NONE",
+        timestamp: null,
+        details: "",
+        incidentId: "",
+        clearedAt: new Date().toISOString(),
+      };
+      simulatedBand.status = simulatedBand.currentPass ? "ACTIVE" : "CONNECTED";
+      simulatedBand.events.unshift({
+        id: `ev-clr-${Date.now()}`,
+        time: nowTime,
+        event: "Emergency alert silenced / cleared",
+        type: "SYSTEM",
+        timestamp: new Date().toISOString(),
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "Emergency alert silenced and cleared on band.",
+      });
+    }
+
+    // 3b. POST /api/iot/band/:bandId/emergency
     if (queryPath.includes("emergency") || url.includes("/emergency")) {
       const incidentId = `EMG-BAND-${Date.now().toString(36).toUpperCase()}`;
       const payload = req.body || {};
+      const source = payload.source || (payload.pushedBy ? "AUTHORITY" : "PILGRIM");
+      const pushedBy = payload.pushedBy || (source === "AUTHORITY" ? "Temple Authority Central Command" : null);
+
       simulatedBand.emergencyStatus = {
         active: true,
-        type: payload.type || "SOS",
+        type: payload.type || (source === "AUTHORITY" ? "AUTHORITY_EMERGENCY" : "SOS"),
         timestamp: new Date().toISOString(),
-        details: payload.details || "⚠ EMERGENCY ASSISTANCE REQUESTED from Smart Band",
+        details: payload.details || (source === "AUTHORITY" 
+          ? "⚠ TEMPLE AUTHORITY EMERGENCY BROADCAST: Security & evacuation protocol active." 
+          : "⚠ EMERGENCY ASSISTANCE REQUESTED from Smart Band"),
         incidentId,
         pilgrim: payload.pilgrim || "Ramesh Patel",
         location: `${simulatedBand.location.templeName} - Gate 1`,
+        source,
+        pushedBy,
+        isAuthorityPush: source === "AUTHORITY" || source === "ADMIN" || Boolean(pushedBy),
       };
       simulatedBand.status = "ALERT";
       simulatedBand.events.unshift({
         id: `ev-emg-${Date.now()}`,
         time: nowTime,
-        event: "Emergency SOS triggered",
+        event: source === "AUTHORITY" ? "Authority Emergency Broadcast" : "Emergency SOS triggered",
         type: "EMERGENCY",
         timestamp: new Date().toISOString(),
       });
 
       return res.status(201).json({
         success: true,
-        message: "Emergency alert dispatched to temple central command.",
+        message: "Emergency alert dispatched.",
         data: {
           incidentId,
           emergencyStatus: simulatedBand.emergencyStatus,
@@ -264,6 +297,31 @@ export default async function handler(req, res) {
           type: "HEALTH",
           timestamp: new Date().toISOString(),
         });
+      } else if (type === "EMERGENCY" || type === "AUTHORITY_EMERGENCY") {
+        const incidentId = `EMG-BAND-${Date.now().toString(36).toUpperCase()}`;
+        simulatedBand.emergencyStatus = {
+          active: true,
+          type: "AUTHORITY_EMERGENCY",
+          source: "AUTHORITY",
+          pushedBy: "Temple Authority Central Command",
+          timestamp: new Date().toISOString(),
+          details: "⚠ CRITICAL DRILL: Temple Authority dispatched rapid response alert to all wristbands.",
+          incidentId,
+          pilgrim: "Ramesh Patel",
+          location: `${simulatedBand.location.templeName} - Gate 1`,
+          isAuthorityPush: true,
+        };
+        simulatedBand.status = "ALERT";
+        simulatedBand.events.unshift({
+          id: `ev-emg-${Date.now()}`,
+          time: nowTime,
+          event: "Authority Emergency Broadcast",
+          type: "EMERGENCY",
+          timestamp: new Date().toISOString(),
+        });
+      } else if (type === "CLEAR_EMERGENCY") {
+        simulatedBand.emergencyStatus = { active: false, type: "NONE" };
+        simulatedBand.status = simulatedBand.currentPass ? "ACTIVE" : "CONNECTED";
       }
 
       return res.status(200).json({ success: true, type, band: simulatedBand });

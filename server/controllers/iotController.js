@@ -45,6 +45,32 @@ export const triggerEmergency = async (req, res, next) => {
   }
 };
 
+export const clearEmergency = async (req, res, next) => {
+  try {
+    const { bandId } = req.params;
+    const result = await iotService.clearEmergency(bandId || "DV-BAND-0001");
+    return sendSuccess(res, result, "Emergency alert cleared and silenced successfully.");
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const authorityPushEmergency = async (req, res, next) => {
+  try {
+    const { bandId } = req.params;
+    const payload = {
+      ...req.body,
+      source: "AUTHORITY",
+      pushedBy: req.user?.name || req.body.pushedBy || "Temple Authority Central Command",
+      type: req.body.type || "AUTHORITY_EMERGENCY",
+    };
+    const result = await iotService.triggerEmergency(bandId || "DV-BAND-0001", payload);
+    return sendSuccess(res, result, "Authority emergency alert pushed to smart band mesh.", 201);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getBandEvents = async (req, res, next) => {
   try {
     const { bandId } = req.params;

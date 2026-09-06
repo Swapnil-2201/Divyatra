@@ -374,7 +374,7 @@ export const iotService = {
   },
 
   /**
-   * Trigger emergency alert from smart band
+   * Trigger emergency alert from smart band or Temple Authority push
    */
   async triggerEmergency(bandId = "DV-BAND-0001", data = {}) {
     const timeNow = formatTimeString();
@@ -382,7 +382,11 @@ export const iotService = {
     const pilgrim = data.pilgrim || "Ramesh Patel (Devotee)";
     const location = data.location || "Somnath Temple - Gate 1 Turnstile";
     const emergencyType = data.type || "EMERGENCY_ASSISTANCE";
-    const details = data.details || "⚠ EMERGENCY ASSISTANCE REQUESTED from Smart Band";
+    const source = data.source || (data.pushedBy ? "AUTHORITY" : "PILGRIM");
+    const pushedBy = data.pushedBy || (source === "AUTHORITY" ? "Temple Authority Central Command" : null);
+    const details = data.details || (source === "AUTHORITY" 
+      ? "⚠ TEMPLE AUTHORITY EMERGENCY BROADCAST: Security & evacuation protocol active." 
+      : "⚠ EMERGENCY ASSISTANCE REQUESTED from Smart Band");
 
     const emergencyStatus = {
       active: true,
@@ -393,13 +397,16 @@ export const iotService = {
       pilgrim,
       location,
       bandId,
+      source,
+      pushedBy,
+      isAuthorityPush: source === "AUTHORITY" || source === "ADMIN" || Boolean(pushedBy),
     };
 
     const emergencyNotification = {
       id: `notif-emg-${Date.now()}`,
       type: "EMERGENCY",
-      title: "🚨 SOS Alert Dispatched",
-      message: "Emergency response squad notified. Hold tight.",
+      title: source === "AUTHORITY" ? "🏛️ Authority Emergency Push" : "🚨 SOS Alert Dispatched",
+      message: source === "AUTHORITY" ? details : "Emergency response squad notified. Hold tight.",
       timestamp: new Date().toISOString(),
       read: false,
     };
@@ -407,7 +414,7 @@ export const iotService = {
     const emergencyEvent = {
       id: `ev-emg-${Date.now()}`,
       time: timeNow,
-      event: "Emergency SOS triggered",
+      event: source === "AUTHORITY" ? "Authority Emergency Broadcast Received" : "Emergency SOS triggered",
       type: "EMERGENCY",
       timestamp: new Date().toISOString(),
     };
@@ -448,18 +455,82 @@ export const iotService = {
         timestamp: emergencyStatus.timestamp,
         details,
         type: emergencyType,
+        source,
+        pushedBy,
+        isAuthorityPush: emergencyStatus.isAuthorityPush,
       };
       io.to("authority").emit("EMERGENCY_ALERT", socketPayload);
       io.to(`band_${bandId}`).emit("EMERGENCY_ALERT", socketPayload);
       io.emit("EMERGENCY_ALERT", socketPayload);
-      console.log(`🚨 [Socket.IO] Dispatched EMERGENCY_ALERT from band ${bandId} to Authority`);
+      console.log(`🚨 [Socket.IO] Dispatched EMERGENCY_ALERT from band ${bandId} (${source})`);
     }
 
     return {
       success: true,
-      message: "Emergency alert dispatched to temple central command and rapid response team.",
+      message: "Emergency alert dispatched successfully.",
       incidentId,
       emergencyStatus,
+    };
+  },
+
+  /**
+   * Clear and silence active emergency state on the band
+   */
+  async clearEmergency(bandId = "DV-BAND-0001") {
+    const timeNow = formatTimeString();
+    const clearedEvent = {
+      id: `ev-clr-${Date.now()}`,
+      time: timeNow,
+      event: "Emergency alert silenced / cleared",
+      type: "SYSTEM",
+      timestamp: new Date().toISOString(),
+    };
+
+    const cleanEmergencyStatus = {
+      active: false,
+      type: "NONE",
+      timestamp: null,
+      details: "",
+      incidentId: "",
+      clearedAt: new Date().toISOString(),
+    };
+
+    if (isDatabaseConnected()) {
+      try {
+        await IoTDevice.findOneAndUpdate(
+          { bandId },
+          {
+            $set: { emergencyStatus: cleanEmergencyStatus, status: "ACTIVE" },
+            $push: { events: { $each: [clearedEvent], $slice: -30 } },
+          }
+        );
+      } catch (err) {
+        console.warn("⚠️ [IoT] Emergency clear fallback to memory:", err.message);
+      }
+    }
+
+    const band = inMemoryBands.get(bandId) || createDefaultBand();
+    band.emergencyStatus = cleanEmergencyStatus;
+    band.status = "ACTIVE";
+    band.events = [clearedEvent, ...(band.events || [])].slice(0, 30);
+    inMemoryBands.set(bandId, band);
+
+    const io = getIoInstance();
+    if (io) {
+      const socketPayload = {
+        event: "EMERGENCY_CLEARED",
+        bandId,
+        timestamp: new Date().toISOString(),
+      };
+      io.to("authority").emit("EMERGENCY_CLEARED", socketPayload);
+      io.to(`band_${bandId}`).emit("EMERGENCY_CLEARED", socketPayload);
+      io.emit("EMERGENCY_CLEARED", socketPayload);
+    }
+
+    return {
+      success: true,
+      message: "Emergency alert cleared and silenced on smart band.",
+      bandId,
     };
   },
 
@@ -631,11 +702,17 @@ export const iotService = {
       return { success: true, notification: notif };
     }
 
-    if (type === "EMERGENCY") {
+    if (type === "EMERGENCY" || type === "AUTHORITY_EMERGENCY") {
       return await this.triggerEmergency(bandId, {
-        type: "SIMULATED_SOS",
-        details: "Demo simulated emergency triggered by operator.",
+        type: "AUTHORITY_EMERGENCY",
+        source: "AUTHORITY",
+        pushedBy: "Temple Central Command",
+        details: "⚠ CRITICAL DRILL: Temple Authority dispatched rapid response alert to all personnel and registered wristbands.",
       });
+    }
+
+    if (type === "CLEAR_EMERGENCY") {
+      return await this.clearEmergency(bandId);
     }
 
     return { success: false, message: `Unknown simulation type: ${type}` };

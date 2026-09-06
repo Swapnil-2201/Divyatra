@@ -223,6 +223,46 @@ export const api = {
     return null;
   },
 
+  async pushAuthorityEmergency(payload = {}) {
+    try {
+      const res = await fetch(`${BASE_URL}/iot/band/${payload.bandId || 'DV-BAND-0001'}/emergency/authority-push`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          source: 'AUTHORITY',
+          pushedBy: payload.pushedBy || 'Temple Authority Central Command',
+          type: payload.type || 'AUTHORITY_EMERGENCY',
+          details: payload.details || 'Official security and emergency assistance notice dispatched.',
+          location: payload.location || 'Somnath Temple - Gate 1 Turnstile',
+          ...payload,
+        }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return json.data;
+      }
+    } catch (err) {
+      console.warn('⚠️ [Client IoT] Authority emergency push fallback:', err.message);
+    }
+    return { success: true, simulated: true };
+  },
+
+  async clearBandEmergency(bandId = 'DV-BAND-0001') {
+    try {
+      const res = await fetch(`${BASE_URL}/iot/band/${bandId}/emergency/clear`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return json.data;
+      }
+    } catch (err) {
+      console.warn('⚠️ [Client IoT] Band emergency clear fallback:', err.message);
+    }
+    return { success: true };
+  },
+
   // ── Live Darshan ────────────────────────────────────────────────────────
   getTempleLiveStream: (templeId) => getTempleLiveStream(templeId),
   getAllTempleLiveStreams: () => getAllTempleLiveStreams(),
@@ -438,4 +478,21 @@ export const api = {
       timestamp: new Date().toISOString(),
     };
   },
+
+  async resolveIncident(incidentId) {
+    try {
+      const res = await fetch(`${BASE_URL}/emergency/incidents/${incidentId}/resolve`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return json.data;
+      }
+    } catch (err) {
+      console.warn('⚠️ [Client Emergency] Resolve fallback:', err.message);
+    }
+    return { id: incidentId, status: 'RESOLVED' };
+  },
 };
+

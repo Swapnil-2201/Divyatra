@@ -90,6 +90,29 @@ export const AdminDashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
+  const handlePushEmergencyAlert = async (bandId = 'DV-BAND-0001') => {
+    await api.pushAuthorityEmergency({
+      bandId,
+      source: 'AUTHORITY',
+      pushedBy: `${user?.name || 'Temple Authority'} (${authorityRoleLabel})`,
+      type: 'AUTHORITY_EMERGENCY',
+      details: '⚠ CRITICAL DRILL: Temple Central Authority has pushed an emergency alert to this smart band.',
+      location: 'Somnath Temple - Gate 1 Turnstile',
+    });
+    showToast(`🚨 Authority Emergency alert pushed to Smart Band ${bandId}!`, 'error');
+    api.getIoTBands().then((res) => {
+      if (res && res.bands) setIotBandsData(res);
+    });
+  };
+
+  const handleClearBandEmergency = async (bandId = 'DV-BAND-0001') => {
+    await api.clearBandEmergency(bandId);
+    showToast(`✓ Emergency alert cleared and silenced on band ${bandId}.`, 'success');
+    api.getIoTBands().then((res) => {
+      if (res && res.bands) setIotBandsData(res);
+    });
+  };
+
   const handleBroadcast = async (e) => {
     e.preventDefault();
     if (!broadcastTitle || !broadcastBody) {
@@ -103,6 +126,18 @@ export const AdminDashboard = () => {
       severity: broadcastSeverity,
       templeId: 'all'
     });
+
+    if (broadcastSeverity === 'CRITICAL') {
+      await api.pushAuthorityEmergency({
+        bandId: 'DV-BAND-0001',
+        source: 'AUTHORITY',
+        pushedBy: `${user?.name || 'Temple Authority'} (${authorityRoleLabel})`,
+        type: 'AUTHORITY_EMERGENCY',
+        details: `⚠ CRITICAL ADVISORY: ${broadcastTitle} - ${broadcastBody}`,
+      });
+      showToast('Emergency alert also pushed directly to connected Smart Bands!', 'error');
+    }
+
     updateAdvisory(`${broadcastTitle}: ${broadcastBody}`, broadcastSeverity.toLowerCase());
     showToast('Advisory broadcasted to 15,420 active pilgrim apps!', 'success');
     setBroadcastTitle('');
@@ -338,7 +373,7 @@ export const AdminDashboard = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 text-xs font-mono">
+          <div className="flex flex-wrap items-center gap-2.5 text-xs font-mono">
             <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2">
               <span className="text-slate-400">Total:</span>
               <strong className="text-white font-bold">{iotBandsData?.summary?.total || 1}</strong>
@@ -357,6 +392,24 @@ export const AdminDashboard = () => {
               <span>Alerts:</span>
               <strong className="font-bold">{iotBandsData?.summary?.alerts || 0}</strong>
             </div>
+
+            {iotBandsData?.bands?.some((b) => b.emergency) ? (
+              <button
+                onClick={() => handleClearBandEmergency('DV-BAND-0001')}
+                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-sans text-xs font-bold flex items-center gap-1.5 transition-colors shadow"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Clear Band Alert</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => handlePushEmergencyAlert('DV-BAND-0001')}
+                className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-sans text-xs font-bold flex items-center gap-1.5 transition-colors shadow"
+              >
+                <ShieldAlert className="w-3.5 h-3.5" />
+                <span>Push Authority Alert</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -374,12 +427,20 @@ export const AdminDashboard = () => {
                 </span>
               </div>
             </div>
-            <Link
-              to="/admin/emergency"
-              className="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shrink-0 transition-colors shadow"
-            >
-              Open Incident Dispatch &rarr;
-            </Link>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleClearBandEmergency('DV-BAND-0001')}
+                className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold transition-colors shadow"
+              >
+                Clear Alert
+              </button>
+              <Link
+                to="/admin/emergency"
+                className="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shrink-0 transition-colors shadow"
+              >
+                Open Incident Dispatch &rarr;
+              </Link>
+            </div>
           </div>
         )}
 
@@ -394,7 +455,8 @@ export const AdminDashboard = () => {
                 <th className="py-3 px-3 sm:px-4">Battery</th>
                 <th className="py-3 px-3 sm:px-4">Location</th>
                 <th className="py-3 px-3 sm:px-4">Status</th>
-                <th className="py-3 px-3 sm:px-4 text-right">Last Seen</th>
+                <th className="py-3 px-3 sm:px-4">Last Seen</th>
+                <th className="py-3 px-3 sm:px-4 text-right">Authority Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800 text-slate-200">
@@ -425,8 +487,25 @@ export const AdminDashboard = () => {
                       {b.emergency ? 'EMERGENCY ALERT' : b.status}
                     </span>
                   </td>
-                  <td className="py-3.5 px-3 sm:px-4 text-right font-mono text-slate-400 text-[11px]">
+                  <td className="py-3.5 px-3 sm:px-4 font-mono text-slate-400 text-[11px]">
                     {b.lastSeen ? new Date(b.lastSeen).toLocaleTimeString() : 'Just now'}
+                  </td>
+                  <td className="py-3.5 px-3 sm:px-4 text-right">
+                    {b.emergency ? (
+                      <button
+                        onClick={() => handleClearBandEmergency(b.bandId)}
+                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-bold shadow"
+                      >
+                        Clear Alert
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handlePushEmergencyAlert(b.bandId)}
+                        className="px-2.5 py-1 bg-red-600/20 hover:bg-red-600/30 text-red-300 border border-red-500/40 rounded-lg text-[11px] font-bold transition-colors"
+                      >
+                        Push Alert
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
