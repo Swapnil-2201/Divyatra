@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../services/api';
 import { useNotification } from '../context/NotificationContext';
 import {
@@ -22,6 +23,7 @@ import {
 import { Link } from 'react-router-dom';
 
 export const PlanYatraPage = () => {
+  const { t } = useTranslation();
   const { showToast } = useNotification();
   const [currentStep, setCurrentStep] = useState(1);
   const [loadingPlan, setLoadingPlan] = useState(false);
@@ -80,13 +82,13 @@ export const PlanYatraPage = () => {
         <div className="text-center max-w-3xl mx-auto space-y-3">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#E97820]/10 border border-[#E97820]/30 text-[#E97820] text-xs font-bold uppercase tracking-wider">
             <Compass className="w-3.5 h-3.5" />
-            <span>AI Predictive Pilgrimage Planner</span>
+            <span>{t('planYatraPage.badge', { defaultValue: 'AI Predictive Pilgrimage Planner' })}</span>
           </div>
           <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-[#102A56]">
-            Smart Yatra Itinerary Wizard
+            {t('planYatraPage.title', { defaultValue: 'Smart Yatra Itinerary Wizard' })}
           </h1>
           <p className="text-sm sm:text-base text-slate-600">
-            Let our AI optimize your sacred journey to avoid peak congestion, bypass bottlenecks, and guarantee serene Darshan.
+            {t('planYatraPage.subtitle', { defaultValue: 'Let our AI optimize your sacred journey to avoid peak congestion, bypass bottlenecks, and guarantee serene Darshan.' })}
           </p>
         </div>
 

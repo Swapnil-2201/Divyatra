@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useCrowd } from '../context/CrowdContext';
 import { TempleCard } from '../components/common/TempleCard';
 import { Search, Filter, Sparkles, MapPin, Users, Clock, SlidersHorizontal } from 'lucide-react';
 
 export const TemplesPage = () => {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') || '';
 
@@ -48,13 +50,13 @@ export const TemplesPage = () => {
         <div className="text-center max-w-3xl mx-auto space-y-2.5 sm:space-y-3">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#E97820]/10 border border-[#E97820]/30 text-[#E97820] text-[11px] sm:text-xs font-bold uppercase tracking-wider">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Sacred Shrines of Gujarat</span>
+            <span>{t('templesPage.badge', { defaultValue: 'Sacred Shrines of Gujarat' })}</span>
           </div>
           <h1 className="font-serif text-2xl sm:text-4xl md:text-5xl font-bold text-[#102A56]">
-            Pilgrimage Temple Discovery
+            {t('templesPage.title', { defaultValue: 'Pilgrimage Temple Discovery' })}
           </h1>
           <p className="text-xs sm:text-base text-slate-600">
-            Explore live crowd statuses, waiting times, Aarti schedules, and instant Darshan reservations for Gujarat's most revered temples.
+            {t('templesPage.subtitle', { defaultValue: "Explore live crowd statuses, waiting times, Aarti schedules, and instant Darshan reservations for Gujarat's most revered temples." })}
           </p>
         </div>
 
@@ -67,7 +69,7 @@ export const TemplesPage = () => {
               <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search temple name, deity, or location..."
+                placeholder={t('templesPage.searchPlaceholder', { defaultValue: 'Search temple name, deity, or location...' })}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-[#FAF8F5] border border-[#DDD5C5] rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#E97820] text-[#102A56] min-h-[44px]"
@@ -81,10 +83,10 @@ export const TemplesPage = () => {
                 onChange={(e) => setCrowdFilter(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-[#FAF8F5] border border-[#DDD5C5] rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#E97820] text-[#102A56] font-medium min-h-[44px]"
               >
-                <option value="all">All Crowd Levels</option>
-                <option value="low">Low Wait (&lt; 45%)</option>
-                <option value="moderate">Moderate Flow (45-75%)</option>
-                <option value="high">High Crowd (&gt; 75%)</option>
+                <option value="all">{t('templesPage.allCrowd', { defaultValue: 'All Crowd Levels' })}</option>
+                <option value="low">{t('templesPage.lowWait', { defaultValue: 'Low Wait (< 45%)' })}</option>
+                <option value="moderate">{t('templesPage.moderateFlow', { defaultValue: 'Moderate Flow (45-75%)' })}</option>
+                <option value="high">{t('templesPage.highCrowd', { defaultValue: 'High Crowd (> 75%)' })}</option>
               </select>
             </div>
 
@@ -95,9 +97,9 @@ export const TemplesPage = () => {
                 onChange={(e) => setSortBy(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-[#FAF8F5] border border-[#DDD5C5] rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#E97820] text-[#102A56] font-medium min-h-[44px]"
               >
-                <option value="popular">Sort: Featured</option>
-                <option value="wait_asc">Sort: Lowest Wait Time</option>
-                <option value="capacity_desc">Sort: Highest Capacity</option>
+                <option value="popular">{t('templesPage.sortFeatured', { defaultValue: 'Sort: Featured' })}</option>
+                <option value="wait_asc">{t('templesPage.sortWait', { defaultValue: 'Sort: Lowest Wait Time' })}</option>
+                <option value="capacity_desc">{t('templesPage.sortCapacity', { defaultValue: 'Sort: Highest Capacity' })}</option>
               </select>
             </div>
           </div>

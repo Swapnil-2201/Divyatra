@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Users, Clock, Flame, ShieldAlert, ArrowUpRight, TrendingUp } from 'lucide-react';
 
 export const LiveCrowdMeter = ({
@@ -6,9 +7,11 @@ export const LiveCrowdMeter = ({
   waitMinutes = 28,
   activeCount = 3840,
   templeName = "Shree Somnath Jyotirlinga",
+  templeId,
   statusLabel = "Optimal Flow",
   statusColor = "emerald"
 }) => {
+  const { t } = useTranslation();
   let colorClass = "from-emerald-500 to-[#10B981]";
   let textColor = "text-[#0D8259]";
   let bgBadge = "bg-[#ECFDF5] border-[#A7F3D0]";
@@ -23,6 +26,10 @@ export const LiveCrowdMeter = ({
     bgBadge = "bg-[#FFFBEB] border-[#FDE68A]";
   }
 
+  const localizedStatusLabel = percentage >= 75
+    ? t('crowdPage.highCongestion', { defaultValue: statusLabel })
+    : t('crowdPage.optimalFlow', { defaultValue: statusLabel });
+
   return (
     <div className="bg-white rounded-3xl border border-[#E5DED0] p-4 sm:p-8 shadow-luxury space-y-4 sm:space-y-6">
       
@@ -30,16 +37,16 @@ export const LiveCrowdMeter = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
         <div>
           <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-[#E97820]">
-            AI Real-Time Telemetry
+            {t('crowdPage.aiTelemetry', { defaultValue: 'AI Real-Time Telemetry' })}
           </span>
           <h3 className="font-serif text-xl sm:text-2xl font-bold text-[#102A56]">
-            {templeName}
+            {templeId ? t(`templeData.${templeId}.name`, { defaultValue: templeName }) : templeName}
           </h3>
         </div>
 
         <div className={`px-3 py-1.5 rounded-full border text-xs font-bold flex items-center gap-2 self-start sm:self-auto ${bgBadge} ${textColor}`}>
           <span className="w-2 h-2 rounded-full bg-current animate-ping" />
-          <span>{statusLabel}</span>
+          <span>{localizedStatusLabel}</span>
         </div>
       </div>
 
@@ -75,11 +82,13 @@ export const LiveCrowdMeter = ({
                 {percentage}%
               </span>
               <span className="text-[9px] sm:text-[10px] uppercase font-bold text-gray-500 tracking-wider">
-                Occupancy
+                {t('crowd.occupancy', { defaultValue: 'Occupancy' })}
               </span>
             </div>
           </div>
-          <span className="text-xs font-bold text-[#102A56] mt-2">Premise Capacity Meter</span>
+          <span className="text-xs font-bold text-[#102A56] mt-2">
+            {t('crowd.capacityMeter', { defaultValue: 'Premise Capacity Meter' })}
+          </span>
         </div>
 
         {/* Primary Metrics */}
@@ -87,25 +96,25 @@ export const LiveCrowdMeter = ({
           <div className="p-3.5 sm:p-4 rounded-2xl bg-[#FAF8F5] border border-[#EBE4D5]">
             <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
               <Clock className="w-4 h-4 text-[#E97820]" />
-              <span>Estimated Queue Wait</span>
+              <span>{t('crowd.estimatedWait', { defaultValue: 'Estimated Queue Wait' })}</span>
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl sm:text-3xl font-black text-[#102A56] font-serif">~{waitMinutes}</span>
-              <span className="text-xs text-gray-600 font-semibold">minutes to Sanctum</span>
+              <span className="text-xs text-gray-600 font-semibold">{t('crowd.minsToSanctum', { defaultValue: 'minutes to Sanctum' })}</span>
             </div>
           </div>
 
           <div className="p-3.5 sm:p-4 rounded-2xl bg-[#FAF8F5] border border-[#EBE4D5]">
             <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
               <Users className="w-4 h-4 text-[#102A56]" />
-              <span>Active Devotees in Premise</span>
+              <span>{t('crowd.activeDevotees', { defaultValue: 'Active Devotees in Premise' })}</span>
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl sm:text-3xl font-black text-[#102A56] font-serif">
                 {activeCount.toLocaleString()}
               </span>
               <span className="text-xs text-emerald-600 font-bold flex items-center gap-0.5">
-                <TrendingUp className="w-3.5 h-3.5" /> Live Inflow
+                <TrendingUp className="w-3.5 h-3.5" /> {t('crowd.liveInflow', { defaultValue: 'Live Inflow' })}
               </span>
             </div>
           </div>
@@ -115,7 +124,7 @@ export const LiveCrowdMeter = ({
         <div className="p-4 sm:p-5 rounded-2xl bg-[#102A56] text-white space-y-3">
           <div className="flex items-center gap-2 text-xs font-bold text-[#D5A63A] uppercase tracking-wider">
             <ShieldAlert className="w-4 h-4 text-[#E97820]" />
-            <span>DivYatra AI Advisory</span>
+            <span>{t('crowd.aiAdvisory', { defaultValue: 'DivYatra AI Advisory' })}</span>
           </div>
 
           <p className="text-xs text-gray-200 leading-relaxed">

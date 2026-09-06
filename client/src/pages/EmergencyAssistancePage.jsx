@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../services/api';
 import { useNotification } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
@@ -23,6 +24,8 @@ import {
 const EMERGENCY_TYPES = [
   {
     id: 'MEDICAL',
+    key: 'medical',
+    subKey: 'medicalSub',
     label: 'Medical Emergency',
     sublabel: 'Ambulance, first-aid, fainting, or oxygen support',
     icon: HeartPulse,
@@ -34,6 +37,8 @@ const EMERGENCY_TYPES = [
   },
   {
     id: 'LOST_PERSON',
+    key: 'lostPerson',
+    subKey: 'lostPersonSub',
     label: 'Lost Person / Child',
     sublabel: 'Missing child, elder, or family group separation',
     icon: Users,
@@ -45,6 +50,8 @@ const EMERGENCY_TYPES = [
   },
   {
     id: 'CROWD_ASSIST',
+    key: 'crowdAssist',
+    subKey: 'crowdAssistSub',
     label: 'Crowd Assistance',
     sublabel: 'Elderly assistance, wheelchair, or safe exit route',
     icon: UserCheck,
@@ -56,6 +63,8 @@ const EMERGENCY_TYPES = [
   },
   {
     id: 'SECURITY',
+    key: 'security',
+    subKey: 'securitySub',
     label: 'Security & Safety',
     sublabel: 'Theft, lost valuables, bag check, or altercation',
     icon: ShieldAlert,
@@ -99,6 +108,7 @@ const TEMPLE_HELPLINES = [
 ];
 
 export const EmergencyAssistancePage = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { showToast } = useNotification();
 
@@ -153,13 +163,13 @@ export const EmergencyAssistancePage = () => {
         <div className="text-center space-y-2.5 sm:space-y-3">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-100 border border-red-200 text-red-800 text-[11px] sm:text-xs font-bold uppercase tracking-wider">
             <Radio className="w-3.5 h-3.5 text-red-600 animate-pulse" />
-            <span>24x7 Pilgrim Safety & Rapid Help</span>
+            <span>{t('emergencyPage.badge', { defaultValue: '24x7 Pilgrim Safety & Rapid Help' })}</span>
           </div>
           <h1 className="font-serif text-2xl sm:text-4xl font-bold text-[#102A56]">
-            Emergency Assistance & Support
+            {t('emergencyPage.title', { defaultValue: 'Emergency Assistance & Support' })}
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 max-w-xl mx-auto">
-            Need immediate help inside temple premises? Select your requirement below to dispatch the nearest marshal or paramedic.
+            {t('emergencyPage.subtitle', { defaultValue: 'Need immediate help inside temple premises? Select your requirement below to dispatch the nearest marshal or paramedic.' })}
           </p>
         </div>
 
@@ -228,6 +238,8 @@ export const EmergencyAssistancePage = () => {
             {EMERGENCY_TYPES.map((type) => {
               const Icon = type.icon;
               const isSelected = selectedType === type.id;
+              const typeLabel = t(`emergencyPage.${type.key}`, { defaultValue: type.label });
+              const typeSub = t(`emergencyPage.${type.subKey}`, { defaultValue: type.sublabel });
               return (
                 <button
                   key={type.id}
@@ -246,14 +258,14 @@ export const EmergencyAssistancePage = () => {
                   <div className="space-y-0.5 sm:space-y-1">
                     <div className="flex items-center justify-between gap-2">
                       <strong className="font-serif text-sm sm:text-base font-bold text-[#102A56]">
-                        {type.label}
+                        {typeLabel}
                       </strong>
                       {isSelected && (
                         <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping shrink-0" />
                       )}
                     </div>
                     <p className="text-[11px] sm:text-xs text-slate-600 leading-snug">
-                      {type.sublabel}
+                      {typeSub}
                     </p>
                   </div>
                 </button>
@@ -267,7 +279,7 @@ export const EmergencyAssistancePage = () => {
           <div className="flex items-center gap-2 pb-3 border-b border-[#EBE4D5]">
             <LifeBuoy className="w-5 h-5 text-[#E97820]" />
             <h3 className="font-serif text-base sm:text-lg font-bold text-[#102A56]">
-              Specify Location & Details ({activeTypeObj.label})
+              Specify Location & Details ({t(`emergencyPage.${activeTypeObj.key}`, { defaultValue: activeTypeObj.label })})
             </h3>
           </div>
 
@@ -283,10 +295,10 @@ export const EmergencyAssistancePage = () => {
                   onChange={(e) => setSelectedTemple(e.target.value)}
                   className="w-full p-3 bg-[#FAF8F5] border border-[#DDD5C5] rounded-xl text-xs sm:text-sm font-semibold text-[#102A56] focus:outline-none focus:border-[#E97820] min-h-[44px]"
                 >
-                  <option value="somnath">Shree Somnath Jyotirlinga</option>
-                  <option value="dwarka">Shree Dwarkadhish Temple</option>
-                  <option value="ambaji">Shree Ambaji Shaktipeeth</option>
-                  <option value="pavagadh">Shree Pavagadh Mahakali</option>
+                  <option value="somnath">{t('templeData.somnath.name', { defaultValue: 'Shree Somnath Jyotirlinga' })}</option>
+                  <option value="dwarka">{t('templeData.dwarka.name', { defaultValue: 'Shree Dwarkadhish Temple' })}</option>
+                  <option value="ambaji">{t('templeData.ambaji.name', { defaultValue: 'Shree Ambaji Shaktipeeth' })}</option>
+                  <option value="pavagadh">{t('templeData.pavagadh.name', { defaultValue: 'Shree Pavagadh Mahakali' })}</option>
                 </select>
               </div>
 
@@ -348,7 +360,7 @@ export const EmergencyAssistancePage = () => {
               ) : (
                 <>
                   <AlertTriangle className="w-5 h-5 text-amber-300" />
-                  <span>Request Immediate {activeTypeObj.label}</span>
+                  <span>{t('emergencyPage.requestHelp', { defaultValue: 'Submit Emergency Alert' })}</span>
                 </>
               )}
             </button>
@@ -361,7 +373,7 @@ export const EmergencyAssistancePage = () => {
             <div className="flex items-center gap-2">
               <PhoneCall className="w-5 h-5 text-emerald-600" />
               <h3 className="font-serif text-base sm:text-lg font-bold text-[#102A56]">
-                Direct Temple Helplines & Control Rooms
+                {t('emergencyPage.controlRoom', { defaultValue: 'Direct Shrine Control Rooms' })}
               </h3>
             </div>
             <span className="text-[11px] sm:text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
@@ -376,7 +388,7 @@ export const EmergencyAssistancePage = () => {
                 className="p-3.5 sm:p-4 rounded-2xl bg-[#FAF8F5] border border-[#EBE4D5] space-y-2 text-xs"
               >
                 <strong className="font-serif text-xs sm:text-sm font-bold text-[#102A56] block">
-                  {item.temple}
+                  {t(`templeData.${item.id}.shortName`, { defaultValue: item.temple })}
                 </strong>
                 <div className="space-y-1 text-slate-600">
                   <div className="flex justify-between">
