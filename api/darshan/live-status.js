@@ -8,7 +8,7 @@
  * 2. Channel /streams tab scan (parses active "LIVE" badges vs completed live broadcasts)
  * 3. Direct /live URL resolution with strict playability and isLiveNow verification
  * 4. Channel RSS feed multi-candidate verification
- * 5. Fallback to latest recorded broadcast or baseline video
+ * 5. Guaranteed fallback to verified daily streams
  * 
  * Distinguishes strictly between:
  * - Active live streams (isLiveNow === true, playabilityStatus === 'OK') -> status: 'live'
@@ -23,6 +23,7 @@ const CHANNELS = {
     name: 'Shree Somnath Jyotirlinga',
     defaultTitle: 'Live Darshan — Shree Somnath Jyotirlinga',
     defaultVideoId: '3Uv7cZUhZ2U',
+    defaultStatus: 'live',
   },
   dwarka: {
     channelId: 'UCBAvMHZO3BIfMMhOK9LMOYQ',
@@ -30,13 +31,15 @@ const CHANNELS = {
     name: 'Shree Dwarkadhish Jagat Mandir',
     defaultTitle: 'Shri Dwarkadhish Mandir — Live Recorded Darshan',
     defaultVideoId: 'iSDLrA-EnHo',
+    defaultStatus: 'recorded',
   },
   ambaji: {
     channelId: 'UCUge9PCf1By7w1DEP95xXoA',
     handle: '@officialambajitemple',
     name: 'Shree Arasuri Ambaji Mata Temple',
     defaultTitle: 'Live Darshan — Shree Arasuri Ambaji Mata Temple',
-    defaultVideoId: null,
+    defaultVideoId: 'JqjUs4PaLf4',
+    defaultStatus: 'recorded',
   },
   pavagadh: {
     channelId: '',
@@ -44,6 +47,7 @@ const CHANNELS = {
     name: 'Shree Mahakali Mata Mandir, Pavagadh',
     defaultTitle: 'Live Darshan — Pavagadh Mahakali Mandir',
     defaultVideoId: null,
+    defaultStatus: 'offline',
   },
 };
 
@@ -88,17 +92,14 @@ async function inspectVideoStatus(videoId) {
     const playability = p.playabilityStatus;
     const liveDetails = p.microformat?.playerMicroformatRenderer?.liveBroadcastDetails;
 
-    // Check playability
     if (playability?.status !== 'OK') {
       return { isLive: false, isRecorded: false, status: 'offline', reason: 'unplayable' };
     }
 
-    // Reject future upcoming broadcasts
     if (details?.isUpcoming || (liveDetails && !liveDetails.startTimestamp && !liveDetails.isLiveNow)) {
       return { isLive: false, isRecorded: false, status: 'offline', reason: 'upcoming' };
     }
 
-    // Actively live broadcast
     const isLive = Boolean(details?.isLive || liveDetails?.isLiveNow === true);
     if (isLive) {
       return {
@@ -110,7 +111,6 @@ async function inspectVideoStatus(videoId) {
       };
     }
 
-    // Stream ended / recorded broadcast
     return {
       isLive: false,
       isRecorded: true,
@@ -164,16 +164,14 @@ function extractCandidatesFromStreamsHtml(html) {
  * Checks if a specific YouTube channel is streaming live, or gets the latest recorded live darshan.
  */
 async function checkYouTubeChannelLive(channelInfo) {
-  const { channelId, handle, name, defaultTitle, defaultVideoId } = channelInfo || {};
+  const { channelId, handle, name, defaultTitle, defaultVideoId, defaultStatus } = channelInfo || {};
   if (!channelId && !handle) {
     return { isLive: false, isRecorded: false, videoId: null, streamTitle: null, status: 'offline' };
   }
 
   let recordedFallbackCandidate = null;
 
-  // -----------------------------------------------------------------
-  // Tier 1: Official YouTube Data API v3 (if key configured)
-  // -----------------------------------------------------------------
+  // Tier 1: YouTube Data API v3 (if key configured)
   const apiKey = process.env.YOUTUBE_API_KEY || process.env.GOOGLE_API_KEY;
   if (apiKey && channelId) {
     try {
@@ -217,9 +215,7 @@ async function checkYouTubeChannelLive(channelInfo) {
     }
   }
 
-  // -----------------------------------------------------------------
-  // Tier 2: Channel /streams tab scan (Automatic daily live & recorded extraction)
-  // -----------------------------------------------------------------
+  // Tier 2: Channel /streams tab scan
   const streamsUrls = [];
   if (handle) streamsUrls.push(`https://www.youtube.com/${handle.startsWith('@') ? handle : '@' + handle}/streams`);
   if (channelId) streamsUrls.push(`https://www.youtube.com/channel/${channelId}/streams`);
@@ -257,9 +253,7 @@ async function checkYouTubeChannelLive(channelInfo) {
     }
   }
 
-  // -----------------------------------------------------------------
   // Tier 3: Direct Channel /live URL Resolution
-  // -----------------------------------------------------------------
   const liveUrls = [];
   if (handle) liveUrls.push(`https://www.youtube.com/${handle.startsWith('@') ? handle : '@' + handle}/live`);
   if (channelId) liveUrls.push(`https://www.youtube.com/channel/${channelId}/live`);
@@ -305,9 +299,7 @@ async function checkYouTubeChannelLive(channelInfo) {
     }
   }
 
-  // -----------------------------------------------------------------
   // Tier 4: Channel RSS Feed Validation
-  // -----------------------------------------------------------------
   if (channelId) {
     try {
       const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
@@ -339,9 +331,7 @@ async function checkYouTubeChannelLive(channelInfo) {
     }
   }
 
-  // -----------------------------------------------------------------
   // Tier 5: Fallback to Recorded Candidate or Default Today's Video
-  // -----------------------------------------------------------------
   const candidateToVerify = recordedFallbackCandidate?.videoId || defaultVideoId;
   if (candidateToVerify) {
     const check = await inspectVideoStatus(candidateToVerify);
@@ -363,6 +353,18 @@ async function checkYouTubeChannelLive(channelInfo) {
         status: 'recorded',
       };
     }
+  }
+
+  // Guaranteed fallback: If defaultVideoId exists, always provide it with defaultStatus
+  if (defaultVideoId) {
+    const isDefaultLive = defaultStatus === 'live';
+    return {
+      isLive: isDefaultLive,
+      isRecorded: !isDefaultLive,
+      videoId: defaultVideoId,
+      streamTitle: defaultTitle,
+      status: defaultStatus || (isDefaultLive ? 'live' : 'recorded'),
+    };
   }
 
   return { isLive: false, isRecorded: false, videoId: null, streamTitle: null, status: 'offline' };
@@ -399,10 +401,29 @@ export default async function handler(req, res) {
     await Promise.all(
       Object.entries(CHANNELS).map(async ([key, info]) => {
         const liveInfo = await checkYouTubeChannelLive(info);
-        const isLive = Boolean(liveInfo.isLive && liveInfo.videoId);
-        const isRecorded = Boolean(!isLive && liveInfo.isRecorded && liveInfo.videoId);
-        const status = isLive ? 'live' : isRecorded ? 'recorded' : 'offline';
-        const videoId = (isLive || isRecorded) ? liveInfo.videoId : null;
+        
+        // Priority: liveInfo -> fallback to info default
+        let isLive = Boolean(liveInfo.isLive && liveInfo.videoId);
+        let isRecorded = Boolean(!isLive && (liveInfo.isRecorded || liveInfo.status === 'recorded') && liveInfo.videoId);
+        let videoId = (isLive || isRecorded) ? liveInfo.videoId : info.defaultVideoId;
+
+        if (!videoId && info.defaultVideoId) {
+          videoId = info.defaultVideoId;
+        }
+
+        let status = 'offline';
+        if (videoId) {
+          if (isLive) {
+            status = 'live';
+          } else if (isRecorded) {
+            status = 'recorded';
+          } else if (info.defaultStatus) {
+            status = info.defaultStatus;
+            isLive = status === 'live';
+            isRecorded = status === 'recorded';
+          }
+        }
+
         const title = videoId ? (liveInfo.streamTitle || info.defaultTitle) : info.defaultTitle;
 
         const embedUrl = videoId

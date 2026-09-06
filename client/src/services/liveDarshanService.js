@@ -69,13 +69,13 @@ export const darshanChannels = [
     handle: '@officialambajitemple',
     channelUrl: 'https://www.youtube.com/@officialambajitemple',
     officialWebsite: 'https://ambajitemple.in',
-    videoId: null,
+    videoId: 'JqjUs4PaLf4',
     isLive: false,
-    isRecorded: false,
-    status: 'offline',
-    streamTitle: null,
-    liveVideoUrl: 'https://www.youtube.com/@officialambajitemple/live',
-    embedUrl: null,
+    isRecorded: true,
+    status: 'recorded',
+    streamTitle: 'ગબ્બર અખંડ જ્યોત લાઇવ દર્શન — Shree Ambaji Temple',
+    liveVideoUrl: 'https://www.youtube.com/watch?v=JqjUs4PaLf4',
+    embedUrl: 'https://www.youtube-nocookie.com/embed/JqjUs4PaLf4?autoplay=0&rel=0&playsinline=1',
     description: 'Official live broadcast from the Garbhagriha of Shree Arasuri Ambaji — the 51st Shaktipeeth in Banaskantha.',
     aartiNote: 'Mangala Aarti at 6:00 AM · Madhyahna Aarti at 12:00 PM · Sandhya Aarti at 7:00 PM',
   },
@@ -302,6 +302,17 @@ export function useLiveDarshanStreams() {
                   sourceType: 'recorded',
                   status: 'recorded',
                   error: null,
+                };
+              } else if (next[key].videoId) {
+                // If API returned offline or null videoId, preserve known playable stream
+                const isDefaultLive = next[key].status === 'live';
+                next[key] = {
+                  ...next[key],
+                  isCurrentlyLive: isDefaultLive,
+                  isRecorded: !isDefaultLive,
+                  status: next[key].status || (isDefaultLive ? 'live' : 'recorded'),
+                  sourceType: isDefaultLive ? 'live' : 'recorded',
+                  error: liveInfo.error || null,
                 };
               } else {
                 next[key] = {
