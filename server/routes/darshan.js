@@ -262,7 +262,7 @@ router.get('/live-status', async (req, res) => {
       const title = isLive ? (liveInfo.streamTitle || info.defaultTitle) : info.defaultTitle;
 
       const embedUrl = isLive && videoId
-        ? `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&playsinline=1&rel=0`
+        ? `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=0&rel=0&playsinline=1`
         : null;
 
       const liveVideoUrl = isLive && videoId

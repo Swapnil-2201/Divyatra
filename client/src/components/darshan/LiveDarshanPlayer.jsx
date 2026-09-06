@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ExternalLink, Clock, AlertCircle, Youtube, Radio, RefreshCw, Play } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useLiveDarshanStreams } from '../../services/liveDarshanService';
@@ -11,11 +11,19 @@ const TEMPLE_ORDER = ['somnath', 'dwarka', 'ambaji', 'pavagadh'];
  * Renders a tabbed live darshan player for all four Gujarat shrines.
  * Dynamically switches to live embed when YouTube is broadcasting live.
  * Defaults to offline / scheduled Aarti mode when not live.
+ * 
+ * Handles:
+ * - Case A: Live + embeddable → renders YouTube iframe (user clicks Play)
+ * - Case B: Live but embed blocked → shows message + "Open Live on YouTube"
+ * - Case C: No live stream → shows offline state with channel link
+ * - Case D: API failure → shows fallback, never crashes
  */
 export const LiveDarshanPlayer = ({ initialTemple = 'somnath', compact = false }) => {
   const { t } = useTranslation();
   const [activeId, setActiveId] = useState(initialTemple);
   const [embedError, setEmbedError] = useState(false);
+  const [embedLoaded, setEmbedLoaded] = useState(false);
+  const embedTimerRef = useRef(null);
   const { streams, loading, isRefreshing, refreshStatus } = useLiveDarshanStreams();
 
   useEffect(() => {
@@ -27,18 +35,68 @@ export const LiveDarshanPlayer = ({ initialTemple = 'somnath', compact = false }
   const stream = streams[activeId] || streams[initialTemple] || streams['somnath'] || Object.values(streams)[0];
   if (!stream) return null;
 
-  const canEmbed = stream.isCurrentlyLive && stream.embedUrl && !embedError;
+  // Validate embed URL: must be a proper youtube-nocookie or youtube embed URL with a real video ID
+  const hasValidEmbedUrl = Boolean(
+    stream.embedUrl &&
+    typeof stream.embedUrl === 'string' &&
+    (stream.embedUrl.includes('youtube.com/embed/') || stream.embedUrl.includes('youtube-nocookie.com/embed/')) &&
+    !stream.embedUrl.includes('/embed/undefined') &&
+    !stream.embedUrl.includes('/embed/null')
+  );
+
+  const canEmbed = stream.isCurrentlyLive && hasValidEmbedUrl && !embedError;
 
   const handleTabChange = (id) => {
     setActiveId(id);
     setEmbedError(false);
+    setEmbedLoaded(false);
+    if (embedTimerRef.current) {
+      clearTimeout(embedTimerRef.current);
+      embedTimerRef.current = null;
+    }
   };
 
   const handleRefresh = (e) => {
     e.preventDefault();
     setEmbedError(false);
+    setEmbedLoaded(false);
+    if (embedTimerRef.current) {
+      clearTimeout(embedTimerRef.current);
+      embedTimerRef.current = null;
+    }
     refreshStatus();
   };
+
+  const handleIframeLoad = () => {
+    setEmbedLoaded(true);
+    // Clear any pending error timer since the iframe loaded
+    if (embedTimerRef.current) {
+      clearTimeout(embedTimerRef.current);
+      embedTimerRef.current = null;
+    }
+  };
+
+  const handleIframeError = () => {
+    setEmbedError(true);
+    setEmbedLoaded(false);
+    if (embedTimerRef.current) {
+      clearTimeout(embedTimerRef.current);
+      embedTimerRef.current = null;
+    }
+  };
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (embedTimerRef.current) {
+        clearTimeout(embedTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Determine if we should show embed-blocked state (Case B)
+  // This happens when isCurrentlyLive is true, but embed URL is missing/invalid or embed errored
+  const isEmbedBlocked = stream.isCurrentlyLive && (!hasValidEmbedUrl || embedError);
 
   return (
     <div className="bg-white border border-[#E5DED0] rounded-xl overflow-hidden shadow-sm">
@@ -121,7 +179,7 @@ export const LiveDarshanPlayer = ({ initialTemple = 'somnath', compact = false }
           </div>
         )}
 
-        {/* Embed or Fallback */}
+        {/* Case A: Live + Embeddable → YouTube iframe */}
         {canEmbed ? (
           <div className="space-y-2">
             <div className="relative w-full rounded-lg overflow-hidden bg-black aspect-video shadow-inner">
@@ -130,10 +188,11 @@ export const LiveDarshanPlayer = ({ initialTemple = 'somnath', compact = false }
                 className="absolute inset-0 w-full h-full"
                 src={stream.embedUrl}
                 title={`Live Darshan — ${stream.name}`}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
                 referrerPolicy="strict-origin-when-cross-origin"
-                onError={() => setEmbedError(true)}
+                onLoad={handleIframeLoad}
+                onError={handleIframeError}
               />
             </div>
             
@@ -142,9 +201,9 @@ export const LiveDarshanPlayer = ({ initialTemple = 'somnath', compact = false }
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 Live dynamic stream active
               </span>
-              {stream.liveVideoUrl && (
+              {(stream.liveVideoUrl || stream.officialChannelUrl) && (
                 <a
-                  href={stream.liveVideoUrl}
+                  href={stream.liveVideoUrl || stream.officialChannelUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-[#E97820] hover:underline font-semibold text-[11px]"
@@ -156,15 +215,50 @@ export const LiveDarshanPlayer = ({ initialTemple = 'somnath', compact = false }
               )}
             </div>
           </div>
+        ) : isEmbedBlocked ? (
+          /* Case B: Live stream exists but embedding is blocked/errored */
+          <div className="rounded-lg bg-amber-50/80 border border-amber-200 flex flex-col items-center justify-center text-center px-4 sm:px-6 py-8 sm:py-10 space-y-3 sm:space-y-4">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-amber-100 flex items-center justify-center">
+              <AlertCircle className="w-6 h-6 sm:w-7 sm:h-7 text-amber-600" />
+            </div>
+            <div className="space-y-1">
+              <p className="font-semibold text-[#102A56] text-xs sm:text-sm">
+                Live stream is currently unavailable in the embedded player.
+              </p>
+              <p className="text-[11px] sm:text-xs text-slate-500 max-w-sm">
+                The live broadcast is active but may be restricted from embedding. You can watch directly on YouTube.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="inline-flex items-center gap-2 px-4 py-2 sm:py-2.5 rounded-lg border border-[#102A56]/20 bg-white text-[#102A56] text-xs sm:text-sm font-semibold hover:bg-slate-50 transition-colors shadow-sm min-h-[40px]"
+              >
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-[#E97820]' : ''}`} />
+                <span>{isRefreshing ? 'Checking...' : 'Retry Embed'}</span>
+              </button>
+              <a
+                href={stream.liveVideoUrl || stream.officialChannelUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg bg-red-600 text-white text-xs sm:text-sm font-semibold hover:bg-red-700 transition-colors shadow-sm min-h-[40px]"
+              >
+                <Play className="w-4 h-4 fill-white" />
+                <span>Open Live on YouTube</span>
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            </div>
+          </div>
         ) : (
-          /* Standby / Offline State */
+          /* Case C: Offline / No live stream + Case D: API failure fallback */
           <div className="rounded-lg bg-[#F8F5EF] border border-[#E5DED0] flex flex-col items-center justify-center text-center px-4 sm:px-6 py-8 sm:py-10 space-y-3 sm:space-y-4">
             <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#102A56]/8 flex items-center justify-center">
               <Youtube className="w-6 h-6 sm:w-7 sm:h-7 text-[#102A56]/50" />
             </div>
             <div className="space-y-1">
               <p className="font-semibold text-[#102A56] text-xs sm:text-sm">
-                Stream Currently Offline / Awaiting Aarti
+                Live stream currently unavailable
               </p>
               <p className="text-[11px] sm:text-xs text-slate-500 max-w-sm">
                 Live darshan broadcasts dynamically during scheduled Aarti timings. You can visit the official channel to watch previous recordings and upcoming broadcasts.
