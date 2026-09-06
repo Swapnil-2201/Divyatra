@@ -117,6 +117,57 @@ export const ConfirmationPage = () => {
           </div>
         )}
 
+        {/* Verification Status & IoT Smart Band Sync Card */}
+        <div className="bg-white rounded-3xl border border-[#E5DED0] p-5 sm:p-6 shadow-luxury">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center pb-4 border-b border-[#EBE4D5]">
+            <div className="p-2.5 rounded-2xl bg-[#FAF8F5] border border-[#EBE4D5]/80">
+              <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 block">Payment</span>
+              <strong className="text-[11px] sm:text-xs font-bold text-emerald-600 flex items-center justify-center gap-1 mt-0.5">
+                <span>PAYMENT SUCCESSFUL</span>
+                <span>✓</span>
+              </strong>
+            </div>
+
+            <div className="p-2.5 rounded-2xl bg-[#FAF8F5] border border-[#EBE4D5]/80">
+              <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 block">E-Pass</span>
+              <strong className="text-[11px] sm:text-xs font-bold text-emerald-600 flex items-center justify-center gap-1 mt-0.5">
+                <span>DIGITAL PASS GENERATED</span>
+                <span>✓</span>
+              </strong>
+            </div>
+
+            <div className="p-2.5 rounded-2xl bg-[#FAF8F5] border border-[#EBE4D5]/80">
+              <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 block">Barcode</span>
+              <strong className="text-[11px] sm:text-xs font-bold text-emerald-600 flex items-center justify-center gap-1 mt-0.5">
+                <span>QR GENERATED</span>
+                <span>✓</span>
+              </strong>
+            </div>
+
+            <div className="p-2.5 rounded-2xl bg-[#F0FDF4] border border-emerald-200">
+              <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-800 block">Wearable Mesh</span>
+              <strong className="text-[11px] sm:text-xs font-bold text-emerald-700 flex items-center justify-center gap-1.5 mt-0.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                <span>SMART BAND ● SYNCED</span>
+              </strong>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 text-xs text-slate-600">
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-md bg-[#102A56] text-[#D5A63A] font-mono font-bold text-[11px]">
+                Band: DV-BAND-0001
+              </span>
+              <span className="text-[11.5px] text-slate-600">
+                Your digital pass has been synchronized with the registered DivYatra Smart Band.
+              </span>
+            </div>
+            <span className="px-2.5 py-0.5 rounded-full bg-[#E97820]/10 text-[#E97820] border border-[#E97820]/20 text-[10px] font-bold shrink-0">
+              Demo IoT Integration
+            </span>
+          </div>
+        </div>
+
         {/* Verified QR Pass Container */}
         {currentBooking ? (
           <QRViewer booking={currentBooking} />

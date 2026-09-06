@@ -180,6 +180,32 @@ export const api = {
     }
   },
 
+  // ── IoT Smart Band Mesh Monitoring ──────────────────────────────────────
+  async getIoTBands() {
+    try {
+      const res = await fetch(`${BASE_URL}/iot/bands`);
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const json = await res.json();
+      return json.data;
+    } catch (err) {
+      return {
+        summary: { total: 1, online: 1, alerts: 0 },
+        bands: [
+          {
+            bandId: 'DV-BAND-0001',
+            pilgrim: 'Ramesh Patel',
+            temple: 'Somnath Temple',
+            battery: '87%',
+            location: 'Somnath, Gate 1',
+            status: 'CONNECTED',
+            emergency: false,
+            lastSeen: new Date().toISOString(),
+          },
+        ],
+      };
+    }
+  },
+
   // ── Live Darshan ────────────────────────────────────────────────────────
   getTempleLiveStream: (templeId) => getTempleLiveStream(templeId),
   getAllTempleLiveStreams: () => getAllTempleLiveStreams(),

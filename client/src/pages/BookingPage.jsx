@@ -59,9 +59,14 @@ export const BookingPage = () => {
 
   useEffect(() => {
     if (selectedTemple?.darshanSlots?.length > 0) {
-      setSelectedSlot(selectedTemple.darshanSlots[0]);
+      setSelectedSlot((prevSlot) => {
+        // Preserve devotee's chosen slot (e.g. Mahaarti) if it belongs to the current temple
+        const match = prevSlot && selectedTemple.darshanSlots.find((s) => s.id === prevSlot.id);
+        if (match) return match;
+        return selectedTemple.darshanSlots[0];
+      });
     }
-  }, [selectedTemple]);
+  }, [selectedTempleId, selectedTemple?.darshanSlots?.length]);
 
   // Toggle facility checkbox
   const toggleFacility = (facilityId) => {

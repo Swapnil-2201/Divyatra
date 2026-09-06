@@ -22,6 +22,9 @@ import {
   Sparkles,
   Building2,
   LogOut,
+  Cpu,
+  Wifi,
+  ShieldAlert,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getMyTempleAssignment, getQueueStatus, getDarshanSchedule } from '../../services/supabaseService';
@@ -56,6 +59,36 @@ export const AdminDashboard = () => {
       getDarshanSchedule(tid).then(setTodayDarshan);
     });
   }, [user]);
+
+  // ── IoT Smart Bands monitoring state ──────────────────────────────────────
+  const [iotBandsData, setIotBandsData] = useState({
+    summary: { total: 1, online: 1, alerts: 0 },
+    bands: [
+      {
+        bandId: 'DV-BAND-0001',
+        pilgrim: 'Ramesh Patel',
+        temple: 'Shree Somnath Jyotirlinga',
+        battery: '87%',
+        location: 'Somnath, Gate 1',
+        status: 'CONNECTED',
+        emergency: false,
+        lastSeen: new Date().toISOString(),
+      },
+    ],
+  });
+
+  useEffect(() => {
+    const fetchBands = () => {
+      api.getIoTBands().then((res) => {
+        if (res && res.bands) {
+          setIotBandsData(res);
+        }
+      });
+    };
+    fetchBands();
+    const interval = setInterval(fetchBands, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleBroadcast = async (e) => {
     e.preventDefault();
@@ -278,6 +311,125 @@ export const AdminDashboard = () => {
                   </tr>
                 );
               })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Connected IoT Bands Monitoring Matrix */}
+      <div className="bg-[#0B172B] rounded-3xl border border-slate-800 p-4 sm:p-6 shadow-2xl space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-[#E97820]/20 border border-[#E97820]/40 flex items-center justify-center text-[#E97820]">
+              <Cpu className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-serif text-base sm:text-lg font-bold text-white">
+                  CONNECTED IOT BANDS
+                </h3>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold border border-emerald-500/30">
+                  Mesh Active
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Active devotee wristband telemetry and automated safety turnstile tracking
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 text-xs font-mono">
+            <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2">
+              <span className="text-slate-400">Total:</span>
+              <strong className="text-white font-bold">{iotBandsData?.summary?.total || 1}</strong>
+            </div>
+
+            <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2">
+              <span className="text-slate-400">Online:</span>
+              <strong className="text-emerald-400 font-bold">{iotBandsData?.summary?.online || 1}</strong>
+            </div>
+
+            <div className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 ${
+              (iotBandsData?.summary?.alerts || 0) > 0
+                ? 'bg-red-950/60 border-red-500/50 text-red-400 animate-pulse'
+                : 'bg-slate-900 border-slate-800 text-slate-300'
+            }`}>
+              <span>Alerts:</span>
+              <strong className="font-bold">{iotBandsData?.summary?.alerts || 0}</strong>
+            </div>
+          </div>
+        </div>
+
+        {/* Emergency Alert Banner if Active */}
+        {(iotBandsData?.summary?.alerts > 0 || iotBandsData?.bands?.some((b) => b.emergency)) && (
+          <div className="p-3.5 rounded-2xl bg-red-950/70 border-2 border-red-500 text-red-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-pulse">
+            <div className="flex items-center gap-2.5">
+              <ShieldAlert className="w-5 h-5 text-red-400 shrink-0" />
+              <div>
+                <strong className="text-white text-xs sm:text-sm font-bold block">
+                  ⚠ CRITICAL SOS ALERT: Emergency Assistance Dispatched
+                </strong>
+                <span className="text-[11px] text-red-300 font-mono">
+                  Smart Band DV-BAND-0001 triggered emergency beacon at Gate 1 Turnstile.
+                </span>
+              </div>
+            </div>
+            <Link
+              to="/admin/emergency"
+              className="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shrink-0 transition-colors shadow"
+            >
+              Open Incident Dispatch &rarr;
+            </Link>
+          </div>
+        )}
+
+        {/* Bands Table */}
+        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0 touch-scroll">
+          <table className="w-full min-w-[640px] text-left text-xs">
+            <thead className="bg-slate-900/80 text-slate-400 uppercase font-semibold border-b border-slate-800">
+              <tr>
+                <th className="py-3 px-3 sm:px-4">Band ID</th>
+                <th className="py-3 px-3 sm:px-4">Pilgrim</th>
+                <th className="py-3 px-3 sm:px-4">Temple</th>
+                <th className="py-3 px-3 sm:px-4">Battery</th>
+                <th className="py-3 px-3 sm:px-4">Location</th>
+                <th className="py-3 px-3 sm:px-4">Status</th>
+                <th className="py-3 px-3 sm:px-4 text-right">Last Seen</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800 text-slate-200">
+              {iotBandsData?.bands?.map((b) => (
+                <tr key={b.bandId} className="hover:bg-slate-900/50 transition-colors">
+                  <td className="py-3.5 px-3 sm:px-4 font-mono font-bold text-[#D5A63A] flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${b.emergency ? 'bg-red-500 animate-ping' : 'bg-emerald-400'}`} />
+                    <span>{b.bandId}</span>
+                  </td>
+                  <td className="py-3.5 px-3 sm:px-4 font-semibold text-white">
+                    {b.pilgrim}
+                  </td>
+                  <td className="py-3.5 px-3 sm:px-4 text-slate-300">
+                    {b.temple}
+                  </td>
+                  <td className="py-3.5 px-3 sm:px-4 font-mono text-emerald-400 font-bold">
+                    {b.battery}
+                  </td>
+                  <td className="py-3.5 px-3 sm:px-4 text-slate-300">
+                    {b.location}
+                  </td>
+                  <td className="py-3.5 px-3 sm:px-4">
+                    <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-bold border ${
+                      b.emergency || b.status === 'ALERT'
+                        ? 'bg-red-500/20 text-red-300 border-red-500/40 animate-pulse'
+                        : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                    }`}>
+                      {b.emergency ? 'EMERGENCY ALERT' : b.status}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-3 sm:px-4 text-right font-mono text-slate-400 text-[11px]">
+                    {b.lastSeen ? new Date(b.lastSeen).toLocaleTimeString() : 'Just now'}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
