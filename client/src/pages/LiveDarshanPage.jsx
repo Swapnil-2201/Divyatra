@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LiveDarshanPlayer } from '../components/darshan/LiveDarshanPlayer';
 import { useLiveDarshanStreams } from '../services/liveDarshanService';
-import { Clock, ExternalLink, Radio, Play } from 'lucide-react';
+import { Clock, ExternalLink, Radio, Play, Video } from 'lucide-react';
 
 const TEMPLE_ORDER = ['somnath', 'dwarka', 'ambaji', 'pavagadh'];
 
@@ -24,7 +24,7 @@ export const LiveDarshanPage = () => {
             {t('liveDarshan.sectionHeading')}
           </h1>
           <p className="text-sm text-slate-500 mt-2 max-w-2xl">
-            Connect to official live darshan from Somnath, Dwarka, Ambaji, and Pavagadh — streamed dynamically from verified temple channels. When a live feed is offline, we display upcoming Aarti timings and direct channel access.
+            Connect to official live darshan from Somnath, Dwarka, Ambaji, and Pavagadh — streamed dynamically from verified temple channels. When a live broadcast concludes, devotees can view today's recorded Aarti darshan stream directly.
           </p>
         </div>
       </div>
@@ -42,11 +42,18 @@ export const LiveDarshanPage = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {TEMPLE_ORDER.map((id) => {
               const s = streams[id] || {};
+              const isLive = Boolean(s.isCurrentlyLive);
+              const isRecorded = Boolean(!isLive && (s.isRecorded || s.status === 'recorded'));
+
               return (
                 <div
                   key={id}
                   className={`bg-white rounded-xl border p-4 space-y-3 transition-colors flex flex-col justify-between ${
-                    s.isCurrentlyLive ? 'border-red-200 shadow-sm' : 'border-[#E5DED0] hover:border-[#E97820]/40'
+                    isLive
+                      ? 'border-red-200 shadow-sm'
+                      : isRecorded
+                      ? 'border-amber-200/90 shadow-sm'
+                      : 'border-[#E5DED0] hover:border-[#E97820]/40'
                   }`}
                 >
                   <div className="space-y-2">
@@ -55,10 +62,15 @@ export const LiveDarshanPage = () => {
                         <p className="text-sm font-semibold text-[#102A56]">{s.name}</p>
                         <p className="text-[11px] text-slate-500 mt-0.5">{s.channelName}</p>
                       </div>
-                      {s.isCurrentlyLive ? (
+                      {isLive ? (
                         <span className="flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 rounded-full px-2 py-0.5 shrink-0 animate-pulse">
                           <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-live-pulse" />
                           {t('common.liveTag')}
+                        </span>
+                      ) : isRecorded ? (
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200/80 rounded-full px-2 py-0.5 shrink-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          Live Recorded
                         </span>
                       ) : (
                         <span className="text-[10px] text-slate-400 bg-slate-50 border border-slate-200 rounded-full px-2 py-0.5 shrink-0">
@@ -67,9 +79,14 @@ export const LiveDarshanPage = () => {
                       )}
                     </div>
 
-                    {s.isCurrentlyLive && s.streamTitle ? (
+                    {isLive && s.streamTitle ? (
                       <div className="p-2 bg-red-50/60 rounded border border-red-100 text-[11px] text-red-900 line-clamp-2">
                         <span className="font-semibold text-red-700">🔴 Live: </span>
+                        {s.streamTitle}
+                      </div>
+                    ) : isRecorded && s.streamTitle ? (
+                      <div className="p-2 bg-amber-50/70 rounded border border-amber-200/70 text-[11px] text-amber-900 line-clamp-2">
+                        <span className="font-semibold text-amber-800">📹 Live Recorded: </span>
                         {s.streamTitle}
                       </div>
                     ) : (
@@ -92,20 +109,28 @@ export const LiveDarshanPage = () => {
                         className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-1 ${
                           activeId === id
                             ? 'bg-[#102A56] text-white'
-                            : s.isCurrentlyLive
+                            : isLive
                             ? 'bg-red-600 text-white hover:bg-red-700'
+                            : isRecorded
+                            ? 'bg-amber-600 text-white hover:bg-amber-700'
                             : 'border border-[#102A56]/20 text-[#102A56] hover:bg-[#102A56] hover:text-white'
                         }`}
                       >
-                        {s.isCurrentlyLive && activeId !== id && <Play className="w-3 h-3 fill-white" />}
-                        {activeId === id ? 'Watching' : s.isCurrentlyLive ? 'Watch Live' : 'Watch'}
+                        {(isLive || isRecorded) && activeId !== id && <Play className="w-3 h-3 fill-white" />}
+                        {activeId === id
+                          ? 'Watching'
+                          : isLive
+                          ? 'Watch Live'
+                          : isRecorded
+                          ? 'Watch Recorded'
+                          : 'Watch'}
                       </button>
                       <a
                         href={s.liveVideoUrl || s.officialChannelUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="p-2 rounded-lg border border-[#E5DED0] text-slate-500 hover:text-[#E97820] hover:border-[#E97820]/30 transition-colors flex items-center justify-center"
-                        title={s.isCurrentlyLive ? 'Open Live on YouTube' : t('liveDarshan.openChannel')}
+                        title={isLive ? 'Open Live on YouTube' : isRecorded ? 'Watch Recording on YouTube' : t('liveDarshan.openChannel')}
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
                       </a>
@@ -119,10 +144,12 @@ export const LiveDarshanPage = () => {
 
         {/* Note about live streams */}
         <div className="bg-amber-50 border border-amber-100 rounded-xl p-5 text-sm text-amber-800 leading-relaxed">
-          <strong className="font-semibold">About Live Darshan:</strong> Live streams are broadcast directly from official temple channels on YouTube during scheduled Aarti hours. When a shrine is not actively broadcasting, we display the upcoming Aarti timings and direct access to their official verified channel.
+          <strong className="font-semibold">About Live Darshan:</strong> Live streams are broadcast directly from official temple channels on YouTube during scheduled Aarti hours. When an Aarti live stream finishes, the player seamlessly preserves and presents the recorded broadcast for devotees.
         </div>
 
       </div>
     </div>
   );
 };
+
+export default LiveDarshanPage;

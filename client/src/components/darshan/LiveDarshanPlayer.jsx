@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ExternalLink, Clock, AlertCircle, Youtube, Radio, RefreshCw, Play } from 'lucide-react';
+import { ExternalLink, Clock, AlertCircle, Youtube, Radio, RefreshCw, Play, Video } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useLiveDarshanStreams } from '../../services/liveDarshanService';
 
@@ -10,13 +10,9 @@ const TEMPLE_ORDER = ['somnath', 'dwarka', 'ambaji', 'pavagadh'];
  * 
  * Renders a tabbed live darshan player for all four Gujarat shrines.
  * Dynamically switches to live embed when YouTube is broadcasting live.
- * Defaults to offline / scheduled Aarti mode when not live.
- * 
- * Handles:
- * - Case A: Live + embeddable → renders YouTube iframe (user clicks Play)
- * - Case B: Live but embed blocked → shows message + "Open Live on YouTube"
- * - Case C: No live stream → shows offline state with channel link
- * - Case D: API failure → shows fallback, never crashes
+ * When the live broadcast has ended, switches seamlessly to "Live Recorded" mode,
+ * embedding today's recorded Aarti darshan video directly.
+ * Defaults to offline / scheduled Aarti mode when no stream/video is available.
  */
 export const LiveDarshanPlayer = ({ initialTemple = 'somnath', compact = false }) => {
   const { t } = useTranslation();
@@ -35,6 +31,9 @@ export const LiveDarshanPlayer = ({ initialTemple = 'somnath', compact = false }
   const stream = streams[activeId] || streams[initialTemple] || streams['somnath'] || Object.values(streams)[0];
   if (!stream) return null;
 
+  const isLive = Boolean(stream.isCurrentlyLive);
+  const isRecorded = Boolean(!isLive && (stream.isRecorded || stream.status === 'recorded'));
+
   // Validate embed URL: must be a proper youtube-nocookie or youtube embed URL with a real video ID
   const hasValidEmbedUrl = Boolean(
     stream.embedUrl &&
@@ -44,7 +43,7 @@ export const LiveDarshanPlayer = ({ initialTemple = 'somnath', compact = false }
     !stream.embedUrl.includes('/embed/null')
   );
 
-  const canEmbed = stream.isCurrentlyLive && hasValidEmbedUrl && !embedError;
+  const canEmbed = (isLive || isRecorded) && hasValidEmbedUrl && !embedError;
 
   const handleTabChange = (id) => {
     setActiveId(id);
@@ -69,7 +68,6 @@ export const LiveDarshanPlayer = ({ initialTemple = 'somnath', compact = false }
 
   const handleIframeLoad = () => {
     setEmbedLoaded(true);
-    // Clear any pending error timer since the iframe loaded
     if (embedTimerRef.current) {
       clearTimeout(embedTimerRef.current);
       embedTimerRef.current = null;
@@ -95,8 +93,7 @@ export const LiveDarshanPlayer = ({ initialTemple = 'somnath', compact = false }
   }, []);
 
   // Determine if we should show embed-blocked state (Case B)
-  // This happens when isCurrentlyLive is true, but embed URL is missing/invalid or embed errored
-  const isEmbedBlocked = stream.isCurrentlyLive && (!hasValidEmbedUrl || embedError);
+  const isEmbedBlocked = (isLive || isRecorded) && (!hasValidEmbedUrl || embedError);
 
   return (
     <div className="bg-white border border-[#E5DED0] rounded-xl overflow-hidden shadow-sm">
@@ -128,10 +125,15 @@ export const LiveDarshanPlayer = ({ initialTemple = 'somnath', compact = false }
             <span className="hidden sm:inline">{isRefreshing ? 'Checking...' : 'Sync'}</span>
           </button>
 
-          {stream.isCurrentlyLive ? (
+          {isLive ? (
             <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 bg-red-50 border border-red-200 rounded-full animate-pulse">
               <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-live-pulse" />
               <span className="text-[10px] sm:text-[11px] font-bold text-red-600">{t('common.liveTag')}</span>
+            </div>
+          ) : isRecorded ? (
+            <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 border border-amber-200/80 rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              <span className="text-[10px] sm:text-[11px] font-bold text-amber-700">Live Recorded</span>
             </div>
           ) : (
             <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-full">
@@ -148,6 +150,9 @@ export const LiveDarshanPlayer = ({ initialTemple = 'somnath', compact = false }
           const s = streams[id] || {};
           const isActive = id === activeId;
           const tabLabel = t(`templeData.${id}.shortName`, { defaultValue: s.shortName || id });
+          const isTabLive = Boolean(s.isCurrentlyLive);
+          const isTabRecorded = Boolean(!isTabLive && (s.isRecorded || s.status === 'recorded'));
+
           return (
             <button
               key={id}
@@ -159,8 +164,11 @@ export const LiveDarshanPlayer = ({ initialTemple = 'somnath', compact = false }
               }`}
             >
               <span>{tabLabel}</span>
-              {s.isCurrentlyLive && (
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
+              {isTabLive && (
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" title="Live Now" />
+              )}
+              {isTabRecorded && (
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" title="Live Recorded" />
               )}
             </button>
           );
@@ -170,8 +178,8 @@ export const LiveDarshanPlayer = ({ initialTemple = 'somnath', compact = false }
       {/* Player Area */}
       <div className="p-3.5 sm:p-5 space-y-3 sm:space-y-4">
 
-        {/* Live Stream Title Banner (when actively broadcasting) */}
-        {stream.isCurrentlyLive && stream.streamTitle && (
+        {/* Live Stream Title Banner */}
+        {isLive && stream.streamTitle && (
           <div className="flex items-center gap-2 px-3 py-2 bg-red-50/70 border border-red-100 rounded-lg text-xs text-red-900">
             <Radio className="w-4 h-4 text-red-600 shrink-0 animate-pulse" />
             <span className="font-semibold shrink-0">Live Broadcast:</span>
@@ -179,7 +187,17 @@ export const LiveDarshanPlayer = ({ initialTemple = 'somnath', compact = false }
           </div>
         )}
 
-        {/* Case A: Live + Embeddable → YouTube iframe */}
+        {/* Live Recorded Title Banner */}
+        {isRecorded && stream.streamTitle && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-amber-50/70 border border-amber-200/80 rounded-lg text-xs text-amber-950">
+            <Video className="w-4 h-4 text-amber-700 shrink-0" />
+            <span className="font-semibold shrink-0 text-amber-800">Live Recorded:</span>
+            <span className="truncate">{stream.streamTitle}</span>
+            <span className="text-[10px] text-amber-700/80 hidden sm:inline">(Broadcast ended)</span>
+          </div>
+        )}
+
+        {/* Playable Player (Live OR Recorded) */}
         {canEmbed ? (
           <div className="space-y-2">
             <div className="relative w-full rounded-lg overflow-hidden bg-black aspect-video shadow-inner">
@@ -197,10 +215,18 @@ export const LiveDarshanPlayer = ({ initialTemple = 'somnath', compact = false }
             </div>
             
             <div className="flex items-center justify-between text-xs text-slate-500 px-1">
-              <span className="flex items-center gap-1 text-emerald-700 font-medium text-[11px]">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                Live dynamic stream active
-              </span>
+              {isLive ? (
+                <span className="flex items-center gap-1 text-emerald-700 font-medium text-[11px]">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Live dynamic stream active
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-amber-800 font-medium text-[11px]">
+                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                  Live broadcast completed · Playing recorded Aarti darshan
+                </span>
+              )}
+
               {(stream.liveVideoUrl || stream.officialChannelUrl) && (
                 <a
                   href={stream.liveVideoUrl || stream.officialChannelUrl}
@@ -209,24 +235,24 @@ export const LiveDarshanPlayer = ({ initialTemple = 'somnath', compact = false }
                   className="inline-flex items-center gap-1 text-[#E97820] hover:underline font-semibold text-[11px]"
                 >
                   <Play className="w-3 h-3 fill-[#E97820]" />
-                  Open Live on YouTube
+                  {isLive ? 'Open Live on YouTube' : 'Watch on YouTube'}
                   <ExternalLink className="w-3 h-3" />
                 </a>
               )}
             </div>
           </div>
         ) : isEmbedBlocked ? (
-          /* Case B: Live stream exists but embedding is blocked/errored */
+          /* Case B: Stream exists but embedding is blocked/errored */
           <div className="rounded-lg bg-amber-50/80 border border-amber-200 flex flex-col items-center justify-center text-center px-4 sm:px-6 py-8 sm:py-10 space-y-3 sm:space-y-4">
             <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-amber-100 flex items-center justify-center">
               <AlertCircle className="w-6 h-6 sm:w-7 sm:h-7 text-amber-600" />
             </div>
             <div className="space-y-1">
               <p className="font-semibold text-[#102A56] text-xs sm:text-sm">
-                Live stream is currently unavailable in the embedded player.
+                Stream is currently unavailable in the embedded player.
               </p>
               <p className="text-[11px] sm:text-xs text-slate-500 max-w-sm">
-                The live broadcast is active but may be restricted from embedding. You can watch directly on YouTube.
+                The broadcast is available on YouTube but may be restricted from embedding. You can watch directly on YouTube.
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-3">
@@ -245,13 +271,13 @@ export const LiveDarshanPlayer = ({ initialTemple = 'somnath', compact = false }
                 className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg bg-red-600 text-white text-xs sm:text-sm font-semibold hover:bg-red-700 transition-colors shadow-sm min-h-[40px]"
               >
                 <Play className="w-4 h-4 fill-white" />
-                <span>Open Live on YouTube</span>
+                <span>{isLive ? 'Open Live on YouTube' : 'Watch on YouTube'}</span>
                 <ExternalLink className="w-4 h-4" />
               </a>
             </div>
           </div>
         ) : (
-          /* Case C: Offline / No live stream + Case D: API failure fallback */
+          /* Case C: Offline / No stream available */
           <div className="rounded-lg bg-[#F8F5EF] border border-[#E5DED0] flex flex-col items-center justify-center text-center px-4 sm:px-6 py-8 sm:py-10 space-y-3 sm:space-y-4">
             <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#102A56]/8 flex items-center justify-center">
               <Youtube className="w-6 h-6 sm:w-7 sm:h-7 text-[#102A56]/50" />
