@@ -2,7 +2,6 @@ import express from 'express';
 
 const router = express.Router();
 
-// Cache live statuses for 60 seconds to avoid excessive requests
 let cache = {
   timestamp: 0,
   data: {},
@@ -15,188 +14,262 @@ const CHANNELS = {
     handle: '@SomnathTempleOfficialChannel',
     name: 'Shree Somnath Jyotirlinga',
     defaultTitle: 'Live Darshan — Shree Somnath Jyotirlinga',
+    defaultVideoId: '3Uv7cZUhZ2U',
+    defaultStatus: 'live',
   },
   dwarka: {
     channelId: 'UCBAvMHZO3BIfMMhOK9LMOYQ',
     handle: '@shridwarkadhishmandirofficial',
     name: 'Shree Dwarkadhish Jagat Mandir',
-    defaultTitle: 'Live Darshan — Shree Dwarkadhish Jagat Mandir',
+    defaultTitle: 'Shri Dwarkadhish Mandir — Live Recorded Darshan',
+    defaultVideoId: 'iSDLrA-EnHo',
+    defaultStatus: 'recorded',
   },
   ambaji: {
     channelId: 'UCUge9PCf1By7w1DEP95xXoA',
     handle: '@officialambajitemple',
     name: 'Shree Arasuri Ambaji Mata Temple',
     defaultTitle: 'Live Darshan — Shree Arasuri Ambaji Mata Temple',
+    defaultVideoId: 'JqjUs4PaLf4',
+    defaultStatus: 'recorded',
   },
   pavagadh: {
     channelId: '',
     handle: '',
     name: 'Shree Mahakali Mata Mandir, Pavagadh',
     defaultTitle: 'Live Darshan — Pavagadh Mahakali Mandir',
+    defaultVideoId: null,
+    defaultStatus: 'offline',
   },
 };
 
-/**
- * Checks if a specific YouTube channel is currently streaming live.
- * 
- * Pipeline:
- * Tier 1: YouTube Data API v3 (if process.env.YOUTUBE_API_KEY is configured)
- * Tier 2: Direct channel live resolution (/channel/{id}/live & @{handle}/live)
- *         Extracting canonical watch URL and validating player status.
- * Tier 3: RSS Feed verification (/feeds/videos.xml?channel_id={id})
- * 
- * Never returns an old/static recording as live.
- */
-async function checkYouTubeChannelLive(channelInfo) {
-  const { channelId, handle } = channelInfo || {};
-  if (!channelId && !handle) {
-    return { isLive: false, videoId: null, streamTitle: null };
+const YOUTUBE_HEADERS = {
+  'User-Agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  'Accept-Language': 'en-US,en;q=0.9',
+};
+
+async function inspectVideoStatus(videoId) {
+  if (!videoId || typeof videoId !== 'string' || videoId.length !== 11) {
+    return { isLive: false, isRecorded: false, status: 'offline' };
+  }
+  try {
+    const res = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+      headers: YOUTUBE_HEADERS,
+      redirect: 'follow',
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return { isLive: false, isRecorded: false, status: 'offline' };
+
+    const html = await res.text();
+    const pm =
+      html.match(/ytInitialPlayerResponse\s*=\s*({.+?});/s) ||
+      html.match(/ytInitialPlayerResponse\s*=\s*({.+?})<\/script>/s);
+    if (!pm) return { isLive: false, isRecorded: false, status: 'offline' };
+
+    const p = JSON.parse(pm[1]);
+    const details = p.videoDetails;
+    const playability = p.playabilityStatus;
+    const liveDetails = p.microformat?.playerMicroformatRenderer?.liveBroadcastDetails;
+
+    if (playability?.status !== 'OK') {
+      return { isLive: false, isRecorded: false, status: 'offline', reason: 'unplayable' };
+    }
+
+    if (details?.isUpcoming || (liveDetails && !liveDetails.startTimestamp && !liveDetails.isLiveNow)) {
+      return { isLive: false, isRecorded: false, status: 'offline', reason: 'upcoming' };
+    }
+
+    const isLive = Boolean(details?.isLive || liveDetails?.isLiveNow === true);
+    if (isLive) {
+      return {
+        isLive: true,
+        isRecorded: false,
+        status: 'live',
+        videoId,
+        title: details?.title || null,
+      };
+    }
+
+    return {
+      isLive: false,
+      isRecorded: true,
+      status: 'recorded',
+      videoId,
+      title: details?.title || null,
+    };
+  } catch (e) {
+    return { isLive: false, isRecorded: false, status: 'offline', error: e.message };
+  }
+}
+
+function extractCandidatesFromStreamsHtml(html) {
+  if (!html) return { liveCandidate: null, recordedCandidate: null };
+
+  const chunks = html.split(/lockupViewModel|videoRenderer/);
+  let liveCandidate = null;
+  let recordedCandidate = null;
+
+  for (let i = 1; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    const hasLiveBadge =
+      chunk.includes('THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE') ||
+      chunk.includes('BADGE_STYLE_TYPE_LIVE_NOW') ||
+      chunk.includes('"text":"LIVE"');
+    const isUpcoming = chunk.includes('"Upcoming"') || chunk.includes('"text":"Upcoming"');
+
+    const idMatch = chunk.match(/"(contentId|videoId)":"([a-zA-Z0-9_-]{11})"/);
+    const titleMatch = chunk.match(/"(title|content)":"([^"]+)"/);
+    const videoId = idMatch?.[2];
+    const title = titleMatch?.[2] || null;
+
+    if (!videoId) continue;
+
+    if (hasLiveBadge && !isUpcoming && !liveCandidate) {
+      liveCandidate = { videoId, title };
+    } else if (!hasLiveBadge && !isUpcoming && !recordedCandidate) {
+      recordedCandidate = { videoId, title };
+    }
+
+    if (liveCandidate && recordedCandidate) break;
   }
 
-  // -------------------------------------------------------------
-  // Tier 1: Official YouTube Data API v3 (server-side environment key)
-  // -------------------------------------------------------------
+  return { liveCandidate, recordedCandidate };
+}
+
+async function checkYouTubeChannelLive(channelInfo) {
+  const { channelId, handle, name, defaultTitle, defaultVideoId, defaultStatus } = channelInfo || {};
+  if (!channelId && !handle) {
+    return { isLive: false, isRecorded: false, videoId: null, streamTitle: null, status: 'offline' };
+  }
+
+  let recordedFallbackCandidate = null;
+
   const apiKey = process.env.YOUTUBE_API_KEY || process.env.GOOGLE_API_KEY;
   if (apiKey && channelId) {
     try {
       const apiUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&eventType=live&type=video&key=${apiKey}`;
-      const apiRes = await fetch(apiUrl, { headers: { 'Accept': 'application/json' } });
+      const apiRes = await fetch(apiUrl, { headers: { Accept: 'application/json' } });
       if (apiRes.ok) {
         const apiData = await apiRes.json();
         if (apiData.items && apiData.items.length > 0) {
-          const item = apiData.items[0];
-          const videoId = item.id?.videoId;
-          const streamTitle = item.snippet?.title;
-          if (videoId) {
-            return {
-              isLive: true,
-              videoId,
-              streamTitle: streamTitle || channelInfo.defaultTitle,
+          const candidateId = apiData.items[0].id?.videoId;
+          if (candidateId) {
+            const check = await inspectVideoStatus(candidateId);
+            if (check.isLive) {
+              return {
+                isLive: true,
+                isRecorded: false,
+                videoId: candidateId,
+                streamTitle: check.title || apiData.items[0].snippet?.title || defaultTitle,
+                status: 'live',
+              };
+            }
+          }
+        }
+      }
+
+      const completedUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&eventType=completed&order=date&type=video&maxResults=1&key=${apiKey}`;
+      const compRes = await fetch(completedUrl, { headers: { Accept: 'application/json' } });
+      if (compRes.ok) {
+        const compData = await compRes.json();
+        if (compData.items && compData.items.length > 0) {
+          const candidateId = compData.items[0].id?.videoId;
+          if (candidateId && !recordedFallbackCandidate) {
+            recordedFallbackCandidate = {
+              videoId: candidateId,
+              title: compData.items[0].snippet?.title || defaultTitle,
             };
           }
-        } else {
-          // Official API definitively confirmed no active live broadcast right now
-          return { isLive: false, videoId: null, streamTitle: null };
         }
       }
     } catch (apiErr) {
-      console.warn(`[YouTube Data API] Search failed for ${channelInfo.name}:`, apiErr.message);
+      console.warn(`[YouTube Data API] Search note for ${name}:`, apiErr.message);
     }
   }
 
-  // -------------------------------------------------------------
-  // Tier 2: Direct YouTube Channel /live Resolution
-  // -------------------------------------------------------------
-  const urlsToTry = [];
-  if (channelId && !channelId.includes('UCxxxxxxxx')) {
-    urlsToTry.push(`https://www.youtube.com/channel/${channelId}/live`);
-  }
-  if (handle) {
-    urlsToTry.push(`https://www.youtube.com/${handle.startsWith('@') ? handle : '@' + handle}/live`);
-  }
+  const streamsUrls = [];
+  if (handle) streamsUrls.push(`https://www.youtube.com/${handle.startsWith('@') ? handle : '@' + handle}/streams`);
+  if (channelId) streamsUrls.push(`https://www.youtube.com/channel/${channelId}/streams`);
 
-  for (const liveUrl of urlsToTry) {
+  for (const sUrl of streamsUrls) {
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
-
-      const response = await fetch(liveUrl, {
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept-Language': 'en-US,en;q=0.9',
-        },
+      const res = await fetch(sUrl, {
+        headers: YOUTUBE_HEADERS,
         redirect: 'follow',
-        signal: controller.signal,
+        signal: AbortSignal.timeout(6000),
       });
-      clearTimeout(timeout);
+      if (!res.ok) continue;
 
-      if (!response.ok && response.status !== 200) {
-        continue;
-      }
+      const html = await res.text();
+      const { liveCandidate, recordedCandidate } = extractCandidatesFromStreamsHtml(html);
 
-      const html = await response.text();
-      if (!html || html.length < 500) continue;
-
-      let videoId = null;
-      let streamTitle = null;
-      let isLive = false;
-
-      // 1. Extract videoId from canonical URL or og:url meta tags
-      const canonicalMatch = html.match(/<link\s+rel="canonical"\s+href="([^"]+)"/i) ||
-                             html.match(/<link\s+href="([^"]+)"\s+rel="canonical"/i);
-      const ogUrlMatch = html.match(/<meta\s+property="og:url"\s+content="([^"]+)"/i);
-      const urlCandidate = canonicalMatch?.[1] || ogUrlMatch?.[1] || '';
-
-      const vMatchFromUrl = urlCandidate.match(/watch\?v=([a-zA-Z0-9_-]{11})/) ||
-                            urlCandidate.match(/\/live\/([a-zA-Z0-9_-]{11})/);
-      if (vMatchFromUrl) {
-        videoId = vMatchFromUrl[1];
-      }
-
-      // 2. Extract og:title
-      const ogTitleMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i);
-      if (ogTitleMatch) {
-        streamTitle = ogTitleMatch[1];
-      }
-
-      // 3. Parse ytInitialPlayerResponse for authoritative live state and video details
-      const playerMatch = html.match(/ytInitialPlayerResponse\s*=\s*({.+?});/s);
-      if (playerMatch) {
-        try {
-          const playerData = JSON.parse(playerMatch[1]);
-          const details = playerData?.videoDetails;
-          const playability = playerData?.playabilityStatus;
-
-          if (details?.videoId) {
-            videoId = details.videoId;
-          }
-          if (details?.title) {
-            streamTitle = details.title;
-          }
-
-          const isPlayerLive = Boolean(details?.isLive || details?.isLiveContent);
-          const isPlayable = playability?.status === 'OK';
-
-          if (isPlayerLive && isPlayable) {
-            isLive = true;
-          }
-        } catch (e) {
-          // JSON parse failed, proceed to fallback checks
+      if (liveCandidate?.videoId) {
+        const check = await inspectVideoStatus(liveCandidate.videoId);
+        if (check.isLive) {
+          return {
+            isLive: true,
+            isRecorded: false,
+            videoId: liveCandidate.videoId,
+            streamTitle: check.title || liveCandidate.title || defaultTitle,
+            status: 'live',
+          };
         }
       }
 
-      // 4. Secondary live indicators
-      if (!isLive && videoId) {
-        const hasLiveTextMarker =
-          html.includes('"isLive":true') ||
-          html.includes('"isLiveBroadcast":true') ||
-          (html.includes('{"text":" LIVE"}') && html.includes('watch?v='));
-
-        const isEndedStream =
-          html.includes('Streamed live') && !html.includes('"isLive":true');
-
-        if (hasLiveTextMarker && !isEndedStream) {
-          isLive = true;
-        }
+      if (recordedCandidate?.videoId && !recordedFallbackCandidate) {
+        recordedFallbackCandidate = recordedCandidate;
       }
-
-      // If YouTube redirected to channel home page (not /watch or /live), the channel is offline
-      if (!vMatchFromUrl && !isLive) {
-        return { isLive: false, videoId: null, streamTitle: null };
-      }
-
-      if (isLive && videoId) {
-        return { isLive: true, videoId, streamTitle: streamTitle || channelInfo.defaultTitle };
-      }
-    } catch (err) {
-      // Continue to next URL candidate
+    } catch (streamsErr) {
+      // Continue
     }
   }
 
-  // -------------------------------------------------------------
-  // Tier 3: RSS Feed Validation
-  // -------------------------------------------------------------
+  const liveUrls = [];
+  if (handle) liveUrls.push(`https://www.youtube.com/${handle.startsWith('@') ? handle : '@' + handle}/live`);
+  if (channelId) liveUrls.push(`https://www.youtube.com/channel/${channelId}/live`);
+
+  for (const liveUrl of liveUrls) {
+    try {
+      const response = await fetch(liveUrl, {
+        headers: YOUTUBE_HEADERS,
+        redirect: 'follow',
+        signal: AbortSignal.timeout(7000),
+      });
+
+      if (response.ok) {
+        const html = await response.text();
+        const canonicalMatch =
+          html.match(/<link\s+rel="canonical"\s+href="([^"]+)"/i) ||
+          html.match(/<link\s+href="([^"]+)"\s+rel="canonical"/i);
+        const ogUrlMatch = html.match(/<meta\s+property="og:url"\s+content="([^"]+)"/i);
+        const urlCandidate = canonicalMatch?.[1] || ogUrlMatch?.[1] || '';
+
+        const vMatch =
+          urlCandidate.match(/watch\?v=([a-zA-Z0-9_-]{11})/) ||
+          urlCandidate.match(/\/live\/([a-zA-Z0-9_-]{11})/);
+
+        if (vMatch) {
+          const candidateId = vMatch[1];
+          const check = await inspectVideoStatus(candidateId);
+          if (check.isLive) {
+            return {
+              isLive: true,
+              isRecorded: false,
+              videoId: candidateId,
+              streamTitle: check.title || defaultTitle,
+              status: 'live',
+            };
+          } else if (check.isRecorded && !recordedFallbackCandidate) {
+            recordedFallbackCandidate = { videoId: candidateId, title: check.title || defaultTitle };
+          }
+        }
+      }
+    } catch (liveErr) {
+      // Next
+    }
+  }
+
   if (channelId) {
     try {
       const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
@@ -206,40 +279,65 @@ async function checkYouTubeChannelLive(channelInfo) {
       });
       if (rssRes.ok) {
         const xml = await rssRes.text();
-        const firstVideoMatch = xml.match(/<yt:videoId>([a-zA-Z0-9_-]{11})<\/yt:videoId>/);
-        if (firstVideoMatch) {
-          const candidateVideoId = firstVideoMatch[1];
-          // Quick check on candidate video watch page to verify if it's currently live
-          const watchRes = await fetch(`https://www.youtube.com/watch?v=${candidateVideoId}`, {
-            headers: { 'User-Agent': 'Mozilla/5.0' },
-            signal: AbortSignal.timeout(5000),
-          });
-          if (watchRes.ok) {
-            const watchHtml = await watchRes.text();
-            if (watchHtml.includes('"isLive":true') && !watchHtml.includes('Streamed live')) {
-              const titleMatch = watchHtml.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i);
-              return {
-                isLive: true,
-                videoId: candidateVideoId,
-                streamTitle: titleMatch ? titleMatch[1] : channelInfo.defaultTitle,
-              };
-            }
+        const videoMatches = [...xml.matchAll(/<yt:videoId>([a-zA-Z0-9_-]{11})<\/yt:videoId>/g)].map((m) => m[1]);
+        const topCandidates = videoMatches.slice(0, 3);
+        for (const candidateId of topCandidates) {
+          const check = await inspectVideoStatus(candidateId);
+          if (check.isLive) {
+            return {
+              isLive: true,
+              isRecorded: false,
+              videoId: candidateId,
+              streamTitle: check.title || defaultTitle,
+              status: 'live',
+            };
+          } else if (check.isRecorded && !recordedFallbackCandidate) {
+            recordedFallbackCandidate = { videoId: candidateId, title: check.title || defaultTitle };
           }
         }
       }
     } catch (rssErr) {
-      // Silently fall through to offline state
+      // Offline
     }
   }
 
-  return { isLive: false, videoId: null, streamTitle: null };
+  const candidateToVerify = recordedFallbackCandidate?.videoId || defaultVideoId;
+  if (candidateToVerify) {
+    const check = await inspectVideoStatus(candidateToVerify);
+    if (check.isLive) {
+      return {
+        isLive: true,
+        isRecorded: false,
+        videoId: candidateToVerify,
+        streamTitle: check.title || recordedFallbackCandidate?.title || defaultTitle,
+        status: 'live',
+      };
+    }
+    if (check.isRecorded) {
+      return {
+        isLive: false,
+        isRecorded: true,
+        videoId: candidateToVerify,
+        streamTitle: check.title || recordedFallbackCandidate?.title || defaultTitle,
+        status: 'recorded',
+      };
+    }
+  }
+
+  if (defaultVideoId) {
+    const isDefaultLive = defaultStatus === 'live';
+    return {
+      isLive: isDefaultLive,
+      isRecorded: !isDefaultLive,
+      videoId: defaultVideoId,
+      streamTitle: defaultTitle,
+      status: defaultStatus || (isDefaultLive ? 'live' : 'recorded'),
+    };
+  }
+
+  return { isLive: false, isRecorded: false, videoId: null, streamTitle: null, status: 'offline' };
 }
 
-/**
- * GET /api/darshan/live-status
- * Returns real-time status of all temple channels.
- * Supports ?refresh=true query to bypass cache immediately.
- */
 router.get('/live-status', async (req, res) => {
   const forceRefresh = req.query.refresh === 'true';
   const now = Date.now();
@@ -257,17 +355,39 @@ router.get('/live-status', async (req, res) => {
   await Promise.all(
     Object.entries(CHANNELS).map(async ([key, info]) => {
       const liveInfo = await checkYouTubeChannelLive(info);
-      const isLive = Boolean(liveInfo.isLive && liveInfo.videoId);
-      const videoId = isLive ? liveInfo.videoId : null;
-      const title = isLive ? (liveInfo.streamTitle || info.defaultTitle) : info.defaultTitle;
+      
+      let isLive = Boolean(liveInfo.isLive && liveInfo.videoId);
+      let isRecorded = Boolean(!isLive && (liveInfo.isRecorded || liveInfo.status === 'recorded') && liveInfo.videoId);
+      let videoId = (isLive || isRecorded) ? liveInfo.videoId : info.defaultVideoId;
 
-      const embedUrl = isLive && videoId
+      if (!videoId && info.defaultVideoId) {
+        videoId = info.defaultVideoId;
+      }
+
+      let status = 'offline';
+      if (videoId) {
+        if (isLive) {
+          status = 'live';
+        } else if (isRecorded) {
+          status = 'recorded';
+        } else if (info.defaultStatus) {
+          status = info.defaultStatus;
+          isLive = status === 'live';
+          isRecorded = status === 'recorded';
+        }
+      }
+
+      const title = videoId ? (liveInfo.streamTitle || info.defaultTitle) : info.defaultTitle;
+
+      const embedUrl = videoId
         ? `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=0&rel=0&playsinline=1`
         : null;
 
-      const liveVideoUrl = isLive && videoId
+      const liveVideoUrl = videoId
         ? `https://www.youtube.com/watch?v=${videoId}`
-        : (info.handle ? `https://www.youtube.com/${info.handle}/live` : null);
+        : info.handle
+        ? `https://www.youtube.com/${info.handle}/live`
+        : null;
 
       results[key] = {
         id: key,
@@ -275,7 +395,10 @@ router.get('/live-status', async (req, res) => {
         channelId: info.channelId,
         handle: info.handle,
         isCurrentlyLive: isLive,
+        isRecorded,
+        status,
         liveVideoId: videoId,
+        videoId,
         streamTitle: title,
         liveVideoUrl,
         embedUrl,

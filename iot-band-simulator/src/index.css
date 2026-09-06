@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #060B14;
+    color: #F8F5EF;
+    font-family: 'Inter', sans-serif;
+    overflow-x: hidden;
+  }
+}
+
+/* 2.5D Curved Glass Curved Highlight */
+.glass-reflection {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.22) 0%,
+    rgba(255, 255, 255, 0.08) 25%,
+    transparent 50%,
+    transparent 85%,
+    rgba(255, 255, 255, 0.06) 100%
+  );
+  pointer-events: none;
+}
+
+/* AMOLED Screen Depth */
+.amoled-display {
+  background: radial-gradient(circle at 50% 30%, #08101E 0%, #03060C 70%, #010307 100%);
+}
+
+/* Subtle OLED Scanline Effect */
+.oled-scanlines {
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.15),
+    rgba(0, 0, 0, 0.15) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  pointer-events: none;
+}
+
+/* Haptic Vibration Animation */
+@keyframes hapticVibrate {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  20% { transform: translate(-2px, 1px) rotate(-0.5deg); }
+  40% { transform: translate(2px, -1px) rotate(0.5deg); }
+  60% { transform: translate(-1px, -2px) rotate(0deg); }
+  80% { transform: translate(1px, 2px) rotate(-0.5deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+.animate-vibrate {
+  animation: hapticVibrate 0.3s ease-in-out 3;
+}
+
+/* Custom Scrollbar for Tiny Wearable Screen */
+.band-scroll::-webkit-scrollbar {
+  width: 3px;
+}
+.band-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.band-scroll::-webkit-scrollbar-thumb {
+  background: rgba(233, 120, 32, 0.3);
+  border-radius: 9999px;
+}
+.band-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(233, 120, 32, 0.6);
+}
+
+/* Station Diagnostics Scrollbar */
+.station-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.station-scroll::-webkit-scrollbar-track {
+  background: rgba(11, 23, 43, 0.5);
+  border-radius: 8px;
+}
+.station-scroll::-webkit-scrollbar-thumb {
+  background: #1B2E4E;
+  border-radius: 8px;
+}
+.station-scroll::-webkit-scrollbar-thumb:hover {
+  background: #E97820;
+}

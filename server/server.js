@@ -1,12 +1,15 @@
+import http from "http";
 import express from "express";
 import cors from "cors";
 import morgan from "morgan";
 import dotenv from "dotenv";
+import { Server as SocketIOServer } from "socket.io";
 
 import { connectDB, isDatabaseConnected } from "./config/db.js";
 import { seedDatabaseIfEmpty } from "./utils/seedData.js";
 import { authService } from "./services/authService.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import { setIoInstance } from "./services/iotService.js";
 
 // Routes
 import authRouter from "./routes/auth.js";
@@ -23,12 +26,50 @@ import emergencyRouter from "./routes/emergency.js";
 import yatraRouter from "./routes/yatra.js";
 import darshanRouter from "./routes/darshan.js";
 import auditRouter from "./routes/audit.js";
+import iotRouter from "./routes/iot.js";
 
 dotenv.config();
 
 const app = express();
+const httpServer = http.createServer(app);
 const PORT = process.env.PORT || 5001;
 const HOST = process.env.HOST || "127.0.0.1";
+
+// Socket.IO Real-Time Server initialization
+const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
+});
+
+setIoInstance(io);
+
+io.on("connection", (socket) => {
+  console.log(`🔌 [Socket.IO] Client connected: ${socket.id}`);
+
+  socket.on("join_band", (bandId) => {
+    const targetBand = bandId || "DV-BAND-0001";
+    const room = `band_${targetBand}`;
+    socket.join(room);
+    console.log(`📡 [Socket.IO] Client ${socket.id} joined room ${room}`);
+    socket.emit("connected", {
+      status: "CONNECTED",
+      bandId: targetBand,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  socket.on("join_authority", () => {
+    socket.join("authority");
+    console.log(`🛡️ [Socket.IO] Client ${socket.id} joined authority room`);
+    socket.emit("authority_connected", { status: "AUTHORITY_ONLINE" });
+  });
+
+  socket.on("disconnect", () => {
+    console.log(`🔌 [Socket.IO] Client disconnected: ${socket.id}`);
+  });
+});
 
 // Middlewares
 app.use(cors({ origin: "*" }));
@@ -42,6 +83,7 @@ app.get("/api/health", (req, res) => {
     service: "DivYatra Backend API",
     version: "1.0.0",
     database: isDatabaseConnected() ? "MongoDB Atlas (Connected)" : "Local In-Memory Mock Mode",
+    socketIo: "Active",
     timestamp: new Date().toISOString(),
     supportedTemples: ["somnath", "dwarka", "ambaji", "pavagadh"],
   });
@@ -67,6 +109,9 @@ app.use("/api/emergency", emergencyRouter);
 app.use("/api/yatra", yatraRouter);
 app.use("/api/darshan", darshanRouter);
 
+// IoT Smart Band Simulator Endpoints
+app.use("/api/iot", iotRouter);
+
 // Audit Logging (server-side, uses service_role key — never exposed to frontend)
 app.use("/api/audit", auditRouter);
 
@@ -83,11 +128,12 @@ app.use(errorHandler);
 
 // Initialize DB and Server
 export const startServer = () => {
-  const server = app.listen(PORT, HOST, () => {
+  const server = httpServer.listen(PORT, HOST, () => {
     console.log(`====================================================`);
     console.log(`🛕 DivYatra API Server active on http://localhost:${PORT}`);
     console.log(`   Health Check: http://localhost:${PORT}/api/health`);
     console.log(`   Live Darshan: http://localhost:${PORT}/api/darshan/live-status`);
+    console.log(`   IoT API:      http://localhost:${PORT}/api/iot/band/DV-BAND-0001/state`);
     console.log(`====================================================`);
   });
 
@@ -107,4 +153,6 @@ export const startServer = () => {
 // Start automatically if run directly
 startServer();
 
+export { app, httpServer, io };
 export default app;
+

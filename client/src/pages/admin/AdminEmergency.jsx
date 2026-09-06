@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 import { useNotification } from '../../context/NotificationContext';
+import { useAuth } from '../../context/AuthContext';
 import {
   Siren,
   PhoneCall,
@@ -11,40 +12,114 @@ import {
   Radio,
   Send,
   Users,
-  MapPin
+  MapPin,
+  VolumeX,
+  Volume2,
+  Watch
 } from 'lucide-react';
 
 export const AdminEmergency = () => {
+  const { user } = useAuth();
   const [emergencyData, setEmergencyData] = useState(null);
+  const [bandData, setBandData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sosTemple, setSosTemple] = useState('dwarka');
   const [sosZone, setSosZone] = useState('Gate 1 Moksha Dwaar Entry');
   const [sosDetails, setSosDetails] = useState('');
+  const [pushToBands, setPushToBands] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const { showToast } = useNotification();
 
   const fetchEmergency = async () => {
     setLoading(true);
     const data = await api.getEmergencyData();
     setEmergencyData(data);
+    const bands = await api.getIoTBands();
+    if (bands && bands.bands) setBandData(bands);
     setLoading(false);
   };
 
   useEffect(() => {
     fetchEmergency();
+    const interval = setInterval(async () => {
+      const bands = await api.getIoTBands();
+      if (bands && bands.bands) setBandData(bands);
+    }, 5000);
+    return () => clearInterval(interval);
   }, []);
+
+  const hasActiveBandAlert = bandData?.bands?.some((b) => b.emergency);
+
+  const handlePushAuthorityToBands = async (customDetails = null) => {
+    setActionLoading(true);
+    const officer = user?.name ? `${user.name} (Disaster Command)` : 'Temple Authority HQ';
+    await api.pushAuthorityEmergency({
+      bandId: 'DV-BAND-0001',
+      source: 'AUTHORITY',
+      pushedBy: officer,
+      type: 'AUTHORITY_EMERGENCY',
+      details: customDetails || sosDetails || '⚠ TEMPLE COMMAND ALERT: Evacuation & safety protocol active. Follow staff instructions.',
+      location: `${sosTemple.toUpperCase()} - ${sosZone}`,
+    });
+    showToast('🚨 Emergency alert officially pushed to connected Smart Bands!', 'error');
+    const bands = await api.getIoTBands();
+    if (bands && bands.bands) setBandData(bands);
+    setActionLoading(false);
+  };
+
+  const handleClearBandAlert = async (bandId = 'DV-BAND-0001') => {
+    setActionLoading(true);
+    await api.clearBandEmergency(bandId);
+    showToast(`✓ Smart Band (${bandId}) emergency alert cleared and silenced.`, 'success');
+    const bands = await api.getIoTBands();
+    if (bands && bands.bands) setBandData(bands);
+    setActionLoading(false);
+  };
+
+  const handleResolveIncident = async (incidentId) => {
+    setActionLoading(true);
+    await api.resolveIncident(incidentId);
+    // Also clear band emergency in case it was linked
+    await api.clearBandEmergency('DV-BAND-0001');
+    showToast(`Incident #${incidentId} marked RESOLVED. Band alerts cleared.`, 'success');
+    await fetchEmergency();
+    setActionLoading(false);
+  };
 
   const handleSimulateSOS = async (e) => {
     e.preventDefault();
+    setActionLoading(true);
+    const officer = user?.name ? `${user.name} (Disaster Command)` : 'Temple Authority HQ';
+
     await api.triggerSOS({
       templeId: sosTemple,
       zone: sosZone,
       details: sosDetails || "Simulated emergency SOS alert triggered from operational desk",
-      type: "SECURITY_ASSIST"
+      type: "SECURITY_ASSIST",
+      source: "AUTHORITY",
+      officerName: officer,
+      pushToBands,
     });
-    showToast(`EMERGENCY SOS Triggered for ${sosTemple.toUpperCase()}! Rapid squad dispatched.`, 'error');
+
+    if (pushToBands) {
+      await api.pushAuthorityEmergency({
+        bandId: 'DV-BAND-0001',
+        source: 'AUTHORITY',
+        pushedBy: officer,
+        type: 'AUTHORITY_EMERGENCY',
+        details: sosDetails || `Disaster Drill SOS: ${sosZone} at ${sosTemple.toUpperCase()} shrine.`,
+        location: `${sosTemple.toUpperCase()} - ${sosZone}`,
+      });
+      showToast(`EMERGENCY SOS & Smart Band Push triggered for ${sosTemple.toUpperCase()}!`, 'error');
+    } else {
+      showToast(`EMERGENCY SOS Triggered for ${sosTemple.toUpperCase()}! Rapid squad dispatched.`, 'error');
+    }
+
     setSosDetails('');
-    fetchEmergency();
+    await fetchEmergency();
+    setActionLoading(false);
   };
+
 
   return (
     <div className="space-y-8 text-slate-100">
@@ -64,6 +139,64 @@ export const AdminEmergency = () => {
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-white mt-1">
             Emergency Response & Incident Command
           </h1>
+        </div>
+      </div>
+
+      {/* IoT Smart Band Authority Broadcast Bar */}
+      <div className={`p-4 sm:p-5 rounded-2xl border transition-all duration-300 ${
+        hasActiveBandAlert
+          ? 'bg-red-950/40 border-red-500/50 shadow-lg shadow-red-950/50'
+          : 'bg-[#0B172B] border-slate-800'
+      }`}>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className={`p-2.5 rounded-xl shrink-0 ${
+              hasActiveBandAlert ? 'bg-red-600/30 text-red-400 animate-pulse' : 'bg-slate-800 text-slate-300'
+            }`}>
+              <Watch className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-serif text-sm sm:text-base font-bold text-white">
+                  Devotee IoT Smart Band Mesh Control
+                </h3>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                  hasActiveBandAlert
+                    ? 'bg-red-500/20 text-red-300 border-red-500/30 animate-pulse'
+                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                }`}>
+                  {hasActiveBandAlert ? '🚨 ACTIVE BAND EMERGENCY' : '✓ Mesh Operational (Standby)'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {hasActiveBandAlert
+                  ? 'Devotee wearable bands are currently displaying the official emergency evacuation modal.'
+                  : 'Emergency notification modals on bands are suppressed and will ONLY trigger upon official authority push.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5 self-stretch sm:self-auto shrink-0">
+            {hasActiveBandAlert ? (
+              <button
+                disabled={actionLoading}
+                onClick={() => handleClearBandAlert('DV-BAND-0001')}
+                className="flex-1 sm:flex-initial px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow flex items-center justify-center gap-2 transition-colors min-h-[40px]"
+              >
+                <VolumeX className="w-4 h-4" />
+                <span>Silence & Clear Band Alert</span>
+              </button>
+            ) : (
+              <button
+                disabled={actionLoading}
+                onClick={() => handlePushAuthorityToBands()}
+                className="flex-1 sm:flex-initial px-4 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow flex items-center justify-center gap-2 transition-colors min-h-[40px]"
+              >
+                <Radio className="w-4 h-4 animate-pulse" />
+                <span>Push Authority Emergency to Bands</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -98,7 +231,11 @@ export const AdminEmergency = () => {
                       </span>
                       <strong className="text-sm font-bold text-white">{inc.templeName}</strong>
                     </div>
-                    <span className="text-xs text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded self-start sm:self-auto">
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded self-start sm:self-auto ${
+                      inc.status === 'RESOLVED'
+                        ? 'bg-emerald-500/10 text-emerald-400'
+                        : 'bg-amber-500/10 text-amber-400'
+                    }`}>
                       {inc.status}
                     </span>
                   </div>
@@ -125,6 +262,35 @@ export const AdminEmergency = () => {
                       ))}
                     </div>
                   </div>
+
+                  {/* Authority Action Bar for Incident */}
+                  {inc.status !== 'RESOLVED' && (
+                    <div className="pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-[11px] text-slate-400">
+                        Incident ID: <span className="font-mono text-slate-300">{inc.id}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={actionLoading}
+                          onClick={() => handlePushAuthorityToBands(`🚨 INCIDENT ALERT (${inc.templeName}): ${inc.details}`)}
+                          className="px-2.5 py-1 bg-red-600/20 hover:bg-red-600/30 text-red-300 border border-red-500/30 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5"
+                        >
+                          <Radio className="w-3 h-3" />
+                          <span>Push to Bands</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={actionLoading}
+                          onClick={() => handleResolveIncident(inc.id)}
+                          className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold shadow flex items-center gap-1.5 transition-colors"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Resolve & Silence</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -139,7 +305,7 @@ export const AdminEmergency = () => {
               </h3>
             </div>
             <p className="text-xs text-slate-400">
-              Broadcast a simulated panic/medical incident to test responder response readiness.
+              Broadcast a simulated panic/medical incident to test responder readiness and optionally push emergency notification to Devotee Smart Bands.
             </p>
 
             <form onSubmit={handleSimulateSOS} className="space-y-3.5 sm:space-y-4 text-xs">
@@ -180,16 +346,40 @@ export const AdminEmergency = () => {
                 />
               </div>
 
+              {/* Checkbox toggle for IoT smart band push */}
+              <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between gap-3">
+                <label htmlFor="pushToBandsCheckbox" className="flex items-center gap-2.5 cursor-pointer select-none">
+                  <input
+                    id="pushToBandsCheckbox"
+                    type="checkbox"
+                    checked={pushToBands}
+                    onChange={(e) => setPushToBands(e.target.checked)}
+                    className="w-4 h-4 rounded text-red-600 bg-slate-800 border-slate-700 focus:ring-red-500 focus:ring-2 cursor-pointer"
+                  />
+                  <div>
+                    <span className="font-bold text-white block">
+                      Push Emergency Alert Modal to Pilgrim Smart Bands (IoT)
+                    </span>
+                    <span className="text-[11px] text-slate-400 block">
+                      Devotees will receive official high-priority red alert overlay with tactile vibration.
+                    </span>
+                  </div>
+                </label>
+                <Watch className="w-5 h-5 text-slate-500 shrink-0" />
+              </div>
+
               <button
                 type="submit"
-                className="w-full sm:w-auto px-6 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl shadow transition-colors flex items-center justify-center gap-2 min-h-[44px]"
+                disabled={actionLoading}
+                className="w-full sm:w-auto px-6 py-2.5 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-bold rounded-xl shadow transition-colors flex items-center justify-center gap-2 min-h-[44px]"
               >
                 <Siren className="w-4 h-4" />
-                <span>Trigger Drill SOS Alert</span>
+                <span>{actionLoading ? 'Broadcasting...' : 'Trigger Drill SOS Alert'}</span>
               </button>
             </form>
           </div>
         </div>
+
 
         {/* 24x7 Emergency Contact Directory (Right col) */}
         <div className="space-y-6">

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { api } from '../services/api';
 import { useBooking } from '../context/BookingContext';
 import { useNotification } from '../context/NotificationContext';
@@ -29,14 +30,15 @@ const TEMPLE_TABS = [
 ];
 
 const CATEGORIES = [
-  { id: 'all', label: 'All Offerings' },
-  { id: 'Mahaprasad', label: 'Mahaprasad' },
-  { id: 'Panchamrut', label: 'Panchamrut & Bhog' },
-  { id: 'Temple Special', label: 'Temple Special' },
-  { id: 'Blessings Box', label: 'Blessings Box' },
+  { id: 'all', key: 'allOfferings', label: 'All Offerings' },
+  { id: 'Mahaprasad', key: 'mahaprasad', label: 'Mahaprasad' },
+  { id: 'Panchamrut', key: 'panchamrut', label: 'Panchamrut & Bhog' },
+  { id: 'Temple Special', key: 'templeSpecial', label: 'Temple Special' },
+  { id: 'Blessings Box', key: 'blessingsBox', label: 'Blessings Box' },
 ];
 
 export const PrasadPage = () => {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTemple = searchParams.get('temple') || 'all';
 
@@ -129,24 +131,27 @@ export const PrasadPage = () => {
         <div className="text-center max-w-3xl mx-auto space-y-3.5">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#E97820]/10 border border-[#E97820]/30 text-[#E97820] text-xs font-bold uppercase tracking-wider">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Pure Gir Cow Desi Ghee Certified Offerings</span>
+            <span>{t('prasadStore.badge', { defaultValue: 'Pure Gir Cow Desi Ghee Certified Offerings' })}</span>
           </div>
           <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl font-semibold text-[#102A56] tracking-tight">
-            Sacred Temple Prasadam Store
+            {t('prasadStore.title', { defaultValue: 'Sacred Temple Prasadam Store' })}
           </h1>
           <p className="text-sm sm:text-base text-slate-600 font-light leading-relaxed">
-            Handcrafted with supreme devotion inside holy temple trust kitchens. Consecrated during daily Aarti ceremonies, delivered across India via Speed Post or ready for fast counter pickup.
+            {t('prasadStore.subtitle', { defaultValue: 'Handcrafted with supreme devotion inside holy temple trust kitchens. Consecrated during daily Aarti ceremonies, delivered across India via Speed Post or ready for fast counter pickup.' })}
           </p>
         </div>
 
         {/* ── 1. Temple Selector Buttons (First-Class Feature) ── */}
         <div className="space-y-3">
           <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500 text-center sm:text-left">
-            Select Pilgrimage Shrine
+            {t('prasadStore.selectShrine', { defaultValue: 'Select Pilgrimage Shrine' })}
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
             {TEMPLE_TABS.map((tab) => {
               const active = selectedTemple === tab.id;
+              const tabDisplayName = tab.id === 'all'
+                ? t('prasadStore.allShrines', { defaultValue: tab.name })
+                : t(`templeData.${tab.id}.shortName`, { defaultValue: tab.name });
               return (
                 <button
                   key={tab.id}
@@ -164,12 +169,12 @@ export const PrasadPage = () => {
                         active ? 'bg-white/20 text-[#D5A63A]' : 'bg-slate-100 text-slate-600'
                       }`}
                     >
-                      {tab.count} Items
+                      {t('prasadStore.itemsCount', { count: tab.count, defaultValue: `${tab.count} Items` })}
                     </span>
                   </div>
                   <div>
                     <span className="font-semibold text-xs sm:text-[13px] block leading-tight">
-                      {tab.name}
+                      {tabDisplayName}
                     </span>
                   </div>
                 </button>
@@ -192,7 +197,7 @@ export const PrasadPage = () => {
                     : 'bg-[#FAF8F5] text-slate-600 hover:bg-slate-100 border border-slate-200'
                 }`}
               >
-                {cat.label}
+                {t(`prasadStore.${cat.key}`, { defaultValue: cat.label })}
               </button>
             ))}
           </div>
@@ -208,7 +213,7 @@ export const PrasadPage = () => {
               }`}
             >
               <Package className="w-3.5 h-3.5 text-[#D5A63A]" />
-              <span>Counter Pickup (Free)</span>
+              <span>{t('prasadStore.counterPickup', { defaultValue: 'Counter Pickup (Free)' })}</span>
             </button>
             <button
               onClick={() => setDeliveryMode('SPEED_POST_DELIVERY')}
@@ -219,7 +224,7 @@ export const PrasadPage = () => {
               }`}
             >
               <Truck className="w-3.5 h-3.5 text-[#E97820]" />
-              <span>Speed Post (+₹60)</span>
+              <span>{t('prasadStore.speedPost', { defaultValue: 'Speed Post (+₹60)' })}</span>
             </button>
           </div>
         </div>
@@ -248,6 +253,9 @@ export const PrasadPage = () => {
             {filteredPrasad.map((item) => {
               const inCart = draftBooking.prasadCart.find((p) => p.id === item.id);
               const prasadImg = getPrasadItemImage(item.id, item.templeId);
+              const localizedTempleName = item.templeId
+                ? t(`templeData.${item.templeId}.shortName`, { defaultValue: item.templeName.replace('Shree ', '').replace(' Temple', '').replace(' Jyotirlinga', '').replace(' Shaktipeeth', '') })
+                : item.templeName;
 
               return (
                 <div
@@ -267,7 +275,7 @@ export const PrasadPage = () => {
                     {/* Temple badge */}
                     <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm text-[#102A56] px-2.5 py-1 rounded-md text-[11px] font-bold shadow-md flex items-center gap-1">
                       <Building2 className="w-3 h-3 text-[#E97820]" />
-                      <span>{item.templeName.replace('Shree ', '').replace(' Temple', '').replace(' Jyotirlinga', '').replace(' Shaktipeeth', '')}</span>
+                      <span>{localizedTempleName}</span>
                     </div>
 
                     {/* Price badge */}
@@ -282,7 +290,7 @@ export const PrasadPage = () => {
                       </span>
                       {item.pureGheeCertified && (
                         <span className="bg-emerald-600/90 text-white backdrop-blur-sm px-2 py-0.5 rounded font-semibold text-[10px] flex items-center gap-1">
-                          <Check className="w-3 h-3" /> Pure Ghee
+                          <Check className="w-3 h-3" /> {t('prasadStore.pureGhee', { defaultValue: 'Pure Ghee' })}
                         </span>
                       )}
                     </div>
@@ -291,44 +299,56 @@ export const PrasadPage = () => {
                   {/* Card Content Body */}
                   <div className="p-5 space-y-4 flex-1 flex flex-col justify-between">
                     <div className="space-y-2.5">
-                      <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
-                        <span className="text-[#D5A63A] uppercase tracking-wider font-semibold">
-                          {item.category}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" /> Shelf life: {item.shelfLife || '25 Days'}
-                        </span>
-                      </div>
+                      {(() => {
+                        const localizedName = t(`prasadItems.${item.id}.name`, { defaultValue: item.name });
+                        const localizedCategory = t(`prasadStore.categoryNames.${item.category}`, { defaultValue: item.category });
+                        const localizedDesc = t(`prasadItems.${item.id}.description`, { defaultValue: item.description });
+                        const localizedItemsIncluded = t(`prasadItems.${item.id}.itemsIncluded`, { returnObjects: true, defaultValue: item.itemsIncluded });
+                        const itemsIncludedList = Array.isArray(localizedItemsIncluded) ? localizedItemsIncluded : (item.itemsIncluded || []);
 
-                      <h3 className="font-serif text-lg font-semibold text-[#102A56] leading-snug">
-                        {item.name}
-                      </h3>
+                        return (
+                          <>
+                            <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                              <span className="text-[#D5A63A] uppercase tracking-wider font-semibold">
+                                {localizedCategory}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" /> {t('prasadStore.shelfLife', { days: (item.shelfLife || '25').replace(/[^0-9]/g, '') || '25', defaultValue: `Shelf life: ${item.shelfLife || '25 Days'}` })}
+                              </span>
+                            </div>
 
-                      <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
-                        {item.description}
-                      </p>
+                            <h3 className="font-serif text-lg font-semibold text-[#102A56] leading-snug">
+                              {localizedName}
+                            </h3>
 
-                      {/* Items Included checklist */}
-                      {item.itemsIncluded && (
-                        <div className="pt-2.5 border-t border-slate-100 space-y-1.5">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">
-                            Sacred Contents:
-                          </span>
-                          <ul className="text-[11.5px] text-slate-600 space-y-1">
-                            {item.itemsIncluded.slice(0, 3).map((inc, i) => (
-                              <li key={i} className="flex items-start gap-1.5 leading-tight">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                                <span className="truncate">{inc}</span>
-                              </li>
-                            ))}
-                            {item.itemsIncluded.length > 3 && (
-                              <li className="text-[10px] text-slate-400 pl-5">
-                                + {item.itemsIncluded.length - 3} more sacred items
-                              </li>
+                            <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
+                              {localizedDesc}
+                            </p>
+
+                            {/* Items Included checklist */}
+                            {itemsIncludedList.length > 0 && (
+                              <div className="pt-2.5 border-t border-slate-100 space-y-1.5">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">
+                                  {t('prasadStore.itemsInOrder', { defaultValue: 'Sacred Contents:' })}
+                                </span>
+                                <ul className="text-[11.5px] text-slate-600 space-y-1">
+                                  {itemsIncludedList.slice(0, 3).map((inc, i) => (
+                                    <li key={i} className="flex items-start gap-1.5 leading-tight">
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                                      <span className="truncate">{inc}</span>
+                                    </li>
+                                  ))}
+                                  {itemsIncludedList.length > 3 && (
+                                    <li className="text-[10px] text-slate-400 pl-5">
+                                      {t('prasadStore.moreItems', { count: itemsIncludedList.length - 3, defaultValue: `+ ${itemsIncludedList.length - 3} more sacred items` })}
+                                    </li>
+                                  )}
+                                </ul>
+                              </div>
                             )}
-                          </ul>
-                        </div>
-                      )}
+                          </>
+                        );
+                      })()}
                     </div>
 
                     {/* Bottom Action / Cart Controls */}
@@ -336,7 +356,7 @@ export const PrasadPage = () => {
                       {inCart ? (
                         <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-xl p-2">
                           <span className="text-xs font-bold text-emerald-800 px-2">
-                            {inCart.quantity} in Bag (₹{inCart.quantity * item.price})
+                            {t('prasadStore.inCart', { count: inCart.quantity, defaultValue: `${inCart.quantity} in Bag` })} (₹{inCart.quantity * item.price})
                           </span>
                           <div className="flex items-center gap-1">
                             <button
@@ -358,13 +378,14 @@ export const PrasadPage = () => {
                       ) : (
                         <button
                           onClick={() => {
-                            addPrasadToDraft(item, 1);
-                            showToast(`Added ${item.name} to your sacred bag!`, 'success');
+                            const localizedName = t(`prasadItems.${item.id}.name`, { defaultValue: item.name });
+                            addPrasadToDraft({ ...item, name: localizedName }, 1);
+                            showToast(t('prasadStore.addedToBag', { name: localizedName, defaultValue: `Added ${localizedName} to your sacred bag!` }), 'success');
                           }}
                           className="w-full py-2.5 rounded-xl bg-[#102A56] hover:bg-[#1B3B74] text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-sm group-hover:shadow"
                         >
                           <ShoppingBag className="w-3.5 h-3.5 text-[#D5A63A]" />
-                          <span>Order Sacred Prasad</span>
+                          <span>{t('prasadStore.addToCart', { defaultValue: 'Order Sacred Prasad' })}</span>
                         </button>
                       )}
                     </div>
@@ -385,10 +406,10 @@ export const PrasadPage = () => {
                 </div>
                 <div>
                   <span className="text-[11px] sm:text-xs text-slate-300 block">
-                    {draftBooking.prasadCart.reduce((s, i) => s + i.quantity, 0)} Prasad Box(es) in Bag
+                    {t('prasadStore.inCart', { count: draftBooking.prasadCart.reduce((s, i) => s + i.quantity, 0), defaultValue: `${draftBooking.prasadCart.reduce((s, i) => s + i.quantity, 0)} Prasad Box(es) in Bag` })}
                   </span>
                   <strong className="text-base sm:text-lg font-bold text-[#D5A63A] font-serif">
-                    Total: ₹{totalPrasadAmount}
+                    {t('bookingPage.totalPayable', { defaultValue: 'Total' })}: ₹{totalPrasadAmount}
                   </strong>
                 </div>
               </div>
@@ -397,7 +418,7 @@ export const PrasadPage = () => {
                 onClick={handleCheckoutPrasad}
                 className="w-full xs:w-auto px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-[#E97820] hover:bg-[#D36A18] text-white font-bold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition-all shrink-0 min-h-[44px]"
               >
-                <span>Proceed to Checkout</span>
+                <span>{t('bookingPage.proceedCheckout', { defaultValue: 'Proceed to Checkout' })}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>

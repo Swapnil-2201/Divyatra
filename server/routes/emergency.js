@@ -1,6 +1,7 @@
 import express from "express";
 import { emergencyData } from "../data/emergency.js";
 import { protect, authorize } from "../middleware/auth.js";
+import { iotService } from "../services/iotService.js";
 
 const router = express.Router();
 
@@ -22,7 +23,7 @@ router.get("/", protect, authorize("authority", "admin"), (req, res) => {
 // POST /api/emergency/sos - Accessible to all (even pilgrims in distress, with optionalAuth)
 router.post("/sos", (req, res) => {
   try {
-    const { templeId, zone, type = "PILGRIM_SOS", details, pilgrimContact } = req.body;
+    const { templeId, zone, type = "PILGRIM_SOS", details, pilgrimContact, pushToBands, source } = req.body;
     const incidentId = `SOS-${Date.now()}`;
 
     const newIncident = {
@@ -43,6 +44,22 @@ router.post("/sos", (req, res) => {
     };
 
     activeIncidentsStore.unshift(newIncident);
+
+    // Push emergency notification to registered IoT bands if requested or authority drill
+    if (pushToBands !== false && (source === "AUTHORITY" || type === "SECURITY_ASSIST" || pushToBands === true)) {
+      try {
+        iotService.triggerEmergency("DV-BAND-0001", {
+          type: "AUTHORITY_EMERGENCY",
+          source: "AUTHORITY",
+          pushedBy: req.body.officerName || "Temple Authority Emergency Cell",
+          details: details || `Emergency alert active for ${newIncident.templeName} - ${newIncident.zone}`,
+          location: `${newIncident.templeName} - ${newIncident.zone}`,
+        });
+      } catch (e) {
+        console.warn("⚠️ [Emergency] Smart band push notice:", e.message);
+      }
+    }
+
     res.status(201).json({
       success: true,
       message: "SOS alert dispatched to temple control room and rapid response team!",
@@ -65,6 +82,13 @@ router.post("/incidents/:id/resolve", protect, authorize("authority", "admin"), 
     status: "RESOLVED",
     resolvedAt: new Date().toISOString(),
   };
+
+  // Clear emergency state on IoT smart band mesh
+  try {
+    iotService.clearEmergency("DV-BAND-0001");
+  } catch (e) {
+    console.warn("⚠️ [Emergency] Band clear notice:", e.message);
+  }
 
   res.json({
     success: true,

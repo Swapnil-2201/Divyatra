@@ -6,7 +6,6 @@ import { getTempleImage } from '../data/templeImages';
 import { LiveCrowdMeter } from '../components/crowd/LiveCrowdMeter';
 import { ZoneCongestionMap } from '../components/crowd/ZoneCongestionMap';
 import { Temple3DViewer } from '../components/interactive/Temple3DViewer';
-import { SimulatedCCTVStream } from '../components/crowd/SimulatedCCTVStream';
 import { LiveDarshanPlayer } from '../components/darshan/LiveDarshanPlayer';
 import { TempleGallery } from '../components/common/TempleGallery';
 import { TempleDonationModal } from '../components/temple/TempleDonationModal';
@@ -88,8 +87,7 @@ export const TempleDetailsPage = () => {
     weather,
     facilities,
     zones,
-    darshanSlots,
-    cctvCams
+    darshanSlots
   } = temple;
 
   // Localized temple attributes
@@ -326,11 +324,8 @@ export const TempleDetailsPage = () => {
           </div>
         </div>
 
-        {/* 5. Zone Congestion Map & Live CCTV Feed */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <ZoneCongestionMap zones={zones} templeName={displayTitle} />
-          <SimulatedCCTVStream cams={cctvCams} templeName={displayTitle} />
-        </div>
+        {/* 5. Zone Congestion Map */}
+        <ZoneCongestionMap zones={zones} templeName={displayTitle} columns="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" />
 
         {/* 6. Overview & Sacred Facilities */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

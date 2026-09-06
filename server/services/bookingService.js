@@ -1,6 +1,7 @@
 import { Booking } from "../models/Booking.js";
 import { isDatabaseConnected } from "../config/db.js";
 import { templeService } from "./templeService.js";
+import { iotService } from "./iotService.js";
 
 const inMemoryBookings = [
   {
@@ -106,17 +107,30 @@ export const bookingService = {
       createdAt: new Date().toISOString(),
     };
 
+    let finalBooking = bookingDoc;
+
     if (isDatabaseConnected()) {
       try {
         const created = await Booking.create(bookingDoc);
-        return created.toObject();
+        finalBooking = created.toObject();
       } catch (err) {
         console.warn("⚠️ Mongoose booking write fallback to memory:", err.message);
+        inMemoryBookings.unshift(bookingDoc);
       }
+    } else {
+      inMemoryBookings.unshift(bookingDoc);
     }
 
-    inMemoryBookings.unshift(bookingDoc);
-    return bookingDoc;
+    // IoT Smart Band Integration:
+    // Associate default demo band DV-BAND-0001 and emit PASS_ISSUED event
+    const targetBandId = data.bandId || "DV-BAND-0001";
+    try {
+      await iotService.syncPassToBand(targetBandId, finalBooking);
+    } catch (iotErr) {
+      console.warn("⚠️ [IoT] Smart band sync notice:", iotErr.message);
+    }
+
+    return finalBooking;
   },
 
   /**

@@ -84,9 +84,149 @@ npm run dev
 
 ---
 
-## 🧪 Testing Backend REST Endpoints
-To run the automated test suite verifying all 12 REST API routes:
+## ⌚ IoT Smart Band Simulator (`iot-band-simulator/`)
+
+DivYatra includes a completely separate, standalone **IoT Smart Band Simulator** that emulates a connected pilgrim wearable device:
+
+- **Independent Application**: Located in `iot-band-simulator/`, deployable on its own URL (e.g. `https://divyatra-iot.vercel.app`), completely decoupled from the pilgrim application.
+- **Hardware-Inspired Centerpiece**: Faithful reproduction of the slender Fitbit Inspire 3 / Luxe elongated vertical pill-capsule form factor, matte silicone loop, capacitive touch sensor, and vertical AMOLED watchface.
+- **Real-Time Bidirectional Event Mesh**: Powered by **Socket.IO** rooms (`band_DV-BAND-0001` and `authority`), receiving `PASS_ISSUED` instantly upon booking confirmation.
+- **Cold-Start Persistence**: If the simulator is opened minutes after booking, `GET /api/iot/band/:bandId/state` automatically restores the active pass, scannable QR, and telemetry history.
+- **Telemetry & Safety**: Simulated vitals (Heart rate, stress, temperature with "SIMULATED" badge), GPS simulation (Somnath Temple, Gate 1), live crowd telemetry from backend API, and SOS emergency dispatch.
+
+---
+
+## 🚀 Quick Start & Running Locally
+
+### Prerequisites
+- Node.js (v18 or higher, v24 recommended)
+- npm (v9 or higher)
+
+### 1. One-Command Setup
+To install all dependencies across server, client, and simulator:
 ```bash
-cd server
-node test-endpoints.js
+npm run install:all
 ```
+
+### 2. Run All 3 Services Concurrently
+```bash
+npm run dev:all
+```
+This launches:
+- 🛕 **Express Backend + Socket.IO**: `http://localhost:5001`
+- 📱 **DivYatra Pilgrim App**: `http://localhost:5173`
+- ⌚ **IoT Smart Band Simulator**: `http://localhost:5174`
+
+Or run them individually in separate terminals:
+```bash
+# Terminal 1: Backend Server
+npm run server
+
+# Terminal 2: DivYatra Pilgrim Web/App
+npm run client
+
+# Terminal 3: IoT Smart Band Simulator
+npm run simulator
+```
+
+---
+
+## ⚙️ Environment Variables Configuration
+
+### Backend (`server/.env`)
+```env
+PORT=5001
+HOST=127.0.0.1
+NODE_ENV=development
+# Optional: MongoDB connection string (falls back to in-memory store if omitted)
+MONGODB_URI=
+CLIENT_URL=http://localhost:5173
+```
+
+### Client (`client/.env`)
+```env
+VITE_API_URL=/api
+```
+
+### IoT Simulator (`iot-band-simulator/.env`)
+```env
+VITE_API_URL=/api
+VITE_WS_URL=http://localhost:5001
+```
+
+---
+
+## 📡 Real-Time WebSocket Architecture
+
+```
+DivYatra App (Port 5173)
+       ↓ (POST /api/payment/verify or /api/bookings)
+Express Backend (Port 5001)
+       ↓
+MongoDB / In-Memory IoT Store
+       ↓
+Socket.IO Event Layer (band_DV-BAND-0001 & authority rooms)
+       ↓
+IoT Smart Band Simulator (Port 5174) & Authority Dashboard (/admin)
+```
+
+### How `PASS_ISSUED` Works:
+1. Pilgrim books a Darshan pass and completes payment on DivYatra (`http://localhost:5173`).
+2. Server creates/verifies booking and generates a cryptographic QR payload.
+3. Server associates default demo band `DV-BAND-0001` and emits:
+   ```json
+   {
+     "event": "PASS_ISSUED",
+     "bandId": "DV-BAND-0001",
+     "bookingId": "BK-SOM-8808",
+     "templeId": "somnath",
+     "templeName": "Shree Somnath Jyotirlinga",
+     "date": "2026-10-12",
+     "slot": "10:00 AM",
+     "pilgrims": 2,
+     "leadPilgrim": "Ramesh Patel",
+     "qrPayload": "..."
+   }
+   ```
+4. **DivYatra App Behavior**: The user stays on the booking confirmation page. The page displays `SMART BAND ● SYNCED (DV-BAND-0001)`. The app **never** auto-redirects or opens new windows.
+5. **Simulator Behavior**:
+   - If already open: receives `PASS_ISSUED` over Socket.IO immediately, vibrates with haptic feedback, displays `NEW DIVYATRA PASS` animation, and renders the scannable QR.
+   - If opened later: `GET /api/iot/band/DV-BAND-0001/state` fetches the active pass on cold-start.
+   - Devotee taps `ACKNOWLEDGE`: updates pass status to `PASS ACTIVE`.
+
+---
+
+## 🎬 Step-by-Step Feature Demo Flow
+
+1. Open **DivYatra App** in browser: `http://localhost:5173`
+2. Separately open **IoT Band Simulator**: `http://localhost:5174` (keep both in side-by-side browser windows).
+3. On DivYatra: Navigate to **Book Darshan**, select **Shree Somnath**, choose a slot, and proceed to payment.
+4. Click **Complete Payment & Confirm E-Pass**.
+5. DivYatra remains on `/confirmation`, showing:
+   - `PAYMENT SUCCESSFUL ✓`
+   - `DIGITAL PASS GENERATED ✓`
+   - `QR GENERATED ✓`
+   - `SMART BAND ● SYNCED` (Band: `DV-BAND-0001`)
+6. Notice the **IoT Band Simulator** simultaneously:
+   - Vibrates with haptic notification.
+   - Displays `NEW DIVYATRA PASS` banner.
+   - Renders scannable high-contrast QR code.
+   - Displays Temple, Date, Slot, and Pax info.
+   - Action buttons `VIEW PASS` and `ACKNOWLEDGE`.
+7. Click `ACKNOWLEDGE`: Status transitions to `PASS ACTIVE`.
+8. Cycle wearable screens (using side groove or bottom dots) to view **Vitals Telemetry** (76 BPM), **Location & Gate 1 Crowd Status**, and **Alerts**.
+9. In Simulator Demo Controls, click **Simulate Emergency**.
+10. Open **Authority Dashboard** (`http://localhost:5173/admin`):
+    - View **CONNECTED IOT BANDS** section.
+    - Notice active SOS alert banner and device status updated to `ALERT`.
+
+---
+
+## 🧪 Build Validation
+
+To build both web applications for production verification:
+```bash
+npm run build:all
+```
+Both `client` and `iot-band-simulator` build clean static bundles ready for Vercel deployment.
+

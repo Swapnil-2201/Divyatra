@@ -5,11 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "dev:all": "concurrently \"npm run server\" \"npm run client\" \"npm run simulator\"",
     "client": "cd client && npm run dev",
     "server": "cd server && npm run dev",
-    "install:all": "npm install && cd server && npm install && cd ../client && npm install",
+    "simulator": "cd iot-band-simulator && npm run dev",
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install --legacy-peer-deps && cd ../iot-band-simulator && npm install",
     "install:client": "cd client && npm install --legacy-peer-deps",
+    "install:simulator": "cd iot-band-simulator && npm install",
     "build": "cd client && npm install --legacy-peer-deps && npm run build",
+    "build:simulator": "cd iot-band-simulator && npm run build",
+    "build:all": "cd client && npm install --legacy-peer-deps && npm run build && cd ../iot-band-simulator && npm run build",
     "start": "cd server && npm start"
   },
   "keywords": [

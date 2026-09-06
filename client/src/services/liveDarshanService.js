@@ -5,13 +5,15 @@
  * - Stores verified temple YouTube channel configurations (Channel ID & Handle).
  * - Queries backend API (/api/darshan/live-status) which runs multi-tier detection:
  *   Tier 1: YouTube Data API v3 (if server key configured)
- *   Tier 2: Direct channel live resolution (extracts active watch video ID & validates playability)
- *   Tier 3: RSS feed validation
- * - Supports client-side direct YouTube Data API v3 fallback if VITE_YOUTUBE_API_KEY is configured.
+ *   Tier 2: Direct channel /streams live and recorded extraction
+ *   Tier 3: Direct channel /live URL resolution with playability check
+ *   Tier 4: RSS feed validation
+ *   Tier 5: Fallback to latest recorded broadcast
  * - Distinguishes clearly between:
- *     status: 'live'    -> Active ongoing live broadcast detected
- *     status: 'offline' -> Verified channel is not currently broadcasting
- *     status: 'error'   -> API request failed / service unreachable (never conflated with offline)
+ *     status: 'live'     -> Active ongoing live broadcast detected
+ *     status: 'recorded' -> Live broadcast has ended, recorded stream is playable
+ *     status: 'offline'  -> Channel is not currently broadcasting and has no playable stream
+ *     status: 'error'    -> API request failed / service unreachable
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -29,12 +31,13 @@ export const darshanChannels = [
     handle: '@SomnathTempleOfficialChannel',
     channelUrl: 'https://www.youtube.com/@SomnathTempleOfficialChannel',
     officialWebsite: 'https://somnath.org',
-    videoId: 'iwRJs3r6Bkw',
+    videoId: '3Uv7cZUhZ2U',
     isLive: true,
+    isRecorded: false,
     status: 'live',
-    streamTitle: '🔴 Live Darshan - Shree Somnath Temple, First Jyotirlinga',
-    liveVideoUrl: 'https://www.youtube.com/watch?v=iwRJs3r6Bkw',
-    embedUrl: 'https://www.youtube-nocookie.com/embed/iwRJs3r6Bkw?autoplay=0&rel=0&playsinline=1',
+    streamTitle: 'Live Darshan — Shree Somnath Jyotirlinga',
+    liveVideoUrl: 'https://www.youtube.com/live/3Uv7cZUhZ2U',
+    embedUrl: 'https://www.youtube-nocookie.com/embed/3Uv7cZUhZ2U?autoplay=0&rel=0&playsinline=1',
     description: 'Official darshan broadcast from the sanctum sanctorum of the First Jyotirlinga on the Arabian Sea coast.',
     aartiNote: 'Mangala Aarti at 6:00 AM · Bhog Aarti at 12:00 PM · Sandhya Aarti at 7:00 PM',
   },
@@ -47,12 +50,13 @@ export const darshanChannels = [
     handle: '@shridwarkadhishmandirofficial',
     channelUrl: 'https://www.youtube.com/@shridwarkadhishmandirofficial',
     officialWebsite: 'https://www.dwarkadhish.org',
-    videoId: '-tDZtep30Ec',
-    isLive: true,
-    status: 'live',
-    streamTitle: 'Live Darshan — Shree Dwarkadhish Jagat Mandir',
-    liveVideoUrl: 'https://www.youtube.com/watch?v=-tDZtep30Ec',
-    embedUrl: 'https://www.youtube-nocookie.com/embed/-tDZtep30Ec?autoplay=0&rel=0&playsinline=1',
+    videoId: 'iSDLrA-EnHo',
+    isLive: false,
+    isRecorded: true,
+    status: 'recorded',
+    streamTitle: 'Shri Dwarkadhish Mandir — Live Recorded Darshan',
+    liveVideoUrl: 'https://www.youtube.com/watch?v=iSDLrA-EnHo',
+    embedUrl: 'https://www.youtube-nocookie.com/embed/iSDLrA-EnHo?autoplay=0&rel=0&playsinline=1',
     description: 'Live darshan from the sacred Char Dham shrine of Lord Krishna at the ancient city of Dwarka.',
     aartiNote: 'Mangala Aarti at 6:30 AM · Rajbhog at 12:00 PM · Sandhya Aarti at 7:30 PM',
   },
@@ -65,12 +69,13 @@ export const darshanChannels = [
     handle: '@officialambajitemple',
     channelUrl: 'https://www.youtube.com/@officialambajitemple',
     officialWebsite: 'https://ambajitemple.in',
-    videoId: null,
+    videoId: 'JqjUs4PaLf4',
     isLive: false,
-    status: 'offline',
-    streamTitle: null,
-    liveVideoUrl: 'https://www.youtube.com/@officialambajitemple/live',
-    embedUrl: null,
+    isRecorded: true,
+    status: 'recorded',
+    streamTitle: 'ગબ્બર અખંડ જ્યોત લાઇવ દર્શન — Shree Ambaji Temple',
+    liveVideoUrl: 'https://www.youtube.com/watch?v=JqjUs4PaLf4',
+    embedUrl: 'https://www.youtube-nocookie.com/embed/JqjUs4PaLf4?autoplay=0&rel=0&playsinline=1',
     description: 'Official live broadcast from the Garbhagriha of Shree Arasuri Ambaji — the 51st Shaktipeeth in Banaskantha.',
     aartiNote: 'Mangala Aarti at 6:00 AM · Madhyahna Aarti at 12:00 PM · Sandhya Aarti at 7:00 PM',
   },
@@ -85,6 +90,7 @@ export const darshanChannels = [
     officialWebsite: 'https://gujarattourism.com/destination/details/champaner-pavagadh',
     videoId: null,
     isLive: false,
+    isRecorded: false,
     status: 'offline',
     streamTitle: null,
     liveVideoUrl: null,
@@ -111,8 +117,9 @@ export const TEMPLE_LIVE_STREAMS = darshanChannels.reduce((acc, ch) => {
     streamTitle: ch.streamTitle,
     liveVideoUrl: ch.liveVideoUrl,
     embedUrl: ch.embedUrl,
-    sourceType: ch.isLive ? 'live' : 'channel_link',
+    sourceType: ch.isLive ? 'live' : ch.isRecorded ? 'recorded' : 'channel_link',
     isCurrentlyLive: ch.isLive,
+    isRecorded: ch.isRecorded || false,
     status: ch.status || 'loading',
     error: null,
     description: ch.description,
@@ -122,31 +129,28 @@ export const TEMPLE_LIVE_STREAMS = darshanChannels.reduce((acc, ch) => {
 }, {});
 
 /**
- * Directly queries the official YouTube Data API v3 from client if an API key is provided
+ * Queries YouTube Data API v3 directly from client if API key is provided
  */
 async function queryClientYouTubeDataApi(channelId, apiKey) {
-  if (!apiKey || !channelId) return null;
   try {
     const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&eventType=live&type=video&key=${apiKey}`;
     const res = await fetch(url);
     if (!res.ok) {
-      const errJson = await res.json().catch(() => ({}));
-      throw new Error(`YouTube API HTTP ${res.status}: ${errJson.error?.message || res.statusText}`);
+      return { isLive: false, status: 'error', error: `YouTube API returned ${res.status}` };
     }
     const data = await res.json();
     if (data.items && data.items.length > 0) {
       const item = data.items[0];
       return {
         isLive: true,
-        videoId: item.id?.videoId,
-        streamTitle: item.snippet?.title,
+        videoId: item.id.videoId,
+        streamTitle: item.snippet.title,
         status: 'live',
       };
     }
-    return { isLive: false, videoId: null, streamTitle: null, status: 'offline' };
+    return { isLive: false, status: 'offline' };
   } catch (err) {
-    console.error('[YouTube Data API Client] Query failed:', err.message);
-    return { isLive: false, videoId: null, status: 'error', error: err.message };
+    return { isLive: false, status: 'error', error: err.message };
   }
 }
 
@@ -194,6 +198,7 @@ export async function fetchLiveDarshanStatus(forceRefresh = false) {
               channelId: '',
               handle: '',
               isCurrentlyLive: false,
+              isRecorded: false,
               liveVideoId: null,
               streamTitle: ch.streamTitle,
               embedUrl: null,
@@ -210,6 +215,7 @@ export async function fetchLiveDarshanStatus(forceRefresh = false) {
               channelId: ch.channelId,
               handle: ch.handle,
               isCurrentlyLive: true,
+              isRecorded: false,
               liveVideoId: apiResult.videoId,
               streamTitle: apiResult.streamTitle,
               embedUrl: `https://www.youtube-nocookie.com/embed/${apiResult.videoId}?autoplay=0&rel=0&playsinline=1`,
@@ -222,10 +228,11 @@ export async function fetchLiveDarshanStatus(forceRefresh = false) {
               channelId: ch.channelId,
               handle: ch.handle,
               isCurrentlyLive: false,
-              liveVideoId: null,
+              isRecorded: ch.isRecorded || false,
+              liveVideoId: ch.videoId,
               streamTitle: ch.streamTitle,
-              embedUrl: null,
-              status: apiResult?.status || 'offline',
+              embedUrl: ch.embedUrl,
+              status: apiResult?.status || ch.status || 'offline',
               error: apiResult?.error || null,
             };
           }
@@ -266,29 +273,52 @@ export function useLiveDarshanStreams() {
             const liveInfo = response.streams[key];
             if (liveInfo) {
               hasUpdates = true;
-              const isServerLive = Boolean(liveInfo.isCurrentlyLive && liveInfo.liveVideoId);
+              const isServerLive = Boolean(liveInfo.isCurrentlyLive && (liveInfo.liveVideoId || liveInfo.videoId));
+              const isRecorded = Boolean(!isServerLive && (liveInfo.isRecorded || liveInfo.status === 'recorded'));
+              const videoId = liveInfo.liveVideoId || liveInfo.videoId;
+
               if (isServerLive) {
                 next[key] = {
                   ...next[key],
                   isCurrentlyLive: true,
-                  videoId: liveInfo.liveVideoId,
+                  isRecorded: false,
+                  videoId,
                   streamTitle: liveInfo.streamTitle || next[key].streamTitle,
-                  liveVideoUrl: liveInfo.liveVideoUrl || `https://www.youtube.com/watch?v=${liveInfo.liveVideoId}`,
-                  embedUrl: liveInfo.embedUrl || `https://www.youtube-nocookie.com/embed/${liveInfo.liveVideoId}?autoplay=0&rel=0&playsinline=1`,
+                  liveVideoUrl: liveInfo.liveVideoUrl || `https://www.youtube.com/watch?v=${videoId}`,
+                  embedUrl: liveInfo.embedUrl || `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=0&rel=0&playsinline=1`,
                   sourceType: 'live',
                   status: 'live',
                   error: null,
                 };
-              } else if (next[key].videoId && (key === 'somnath' || key === 'dwarka')) {
+              } else if (isRecorded && videoId) {
                 next[key] = {
                   ...next[key],
-                  isCurrentlyLive: true,
-                  status: 'live',
+                  isCurrentlyLive: false,
+                  isRecorded: true,
+                  videoId,
+                  streamTitle: liveInfo.streamTitle || next[key].streamTitle,
+                  liveVideoUrl: liveInfo.liveVideoUrl || `https://www.youtube.com/watch?v=${videoId}`,
+                  embedUrl: liveInfo.embedUrl || `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=0&rel=0&playsinline=1`,
+                  sourceType: 'recorded',
+                  status: 'recorded',
+                  error: null,
+                };
+              } else if (next[key].videoId) {
+                // If API returned offline or null videoId, preserve known playable stream
+                const isDefaultLive = next[key].status === 'live';
+                next[key] = {
+                  ...next[key],
+                  isCurrentlyLive: isDefaultLive,
+                  isRecorded: !isDefaultLive,
+                  status: next[key].status || (isDefaultLive ? 'live' : 'recorded'),
+                  sourceType: isDefaultLive ? 'live' : 'recorded',
+                  error: liveInfo.error || null,
                 };
               } else {
                 next[key] = {
                   ...next[key],
                   isCurrentlyLive: false,
+                  isRecorded: false,
                   videoId: null,
                   embedUrl: null,
                   sourceType: 'channel_link',
@@ -307,7 +337,7 @@ export function useLiveDarshanStreams() {
         setStreams((prev) => {
           const next = { ...prev };
           Object.keys(next).forEach((key) => {
-            if (!next[key].isCurrentlyLive) {
+            if (!next[key].isCurrentlyLive && !next[key].isRecorded) {
               next[key] = {
                 ...next[key],
                 status: 'error',
@@ -336,9 +366,16 @@ export function useLiveDarshanStreams() {
       if (mounted) syncStatus(false);
     }, 60000);
 
+    // Also auto-refresh when window regains focus
+    const handleFocus = () => {
+      if (mounted) syncStatus(false);
+    };
+    window.addEventListener('focus', handleFocus);
+
     return () => {
       mounted = false;
       clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
     };
   }, [syncStatus]);
 
@@ -366,8 +403,11 @@ export const getLiveStatus = (templeId) => {
   if (!stream) return { isLive: false, label: 'Unknown', sourceType: 'unavailable', status: 'unknown' };
   return {
     isLive: stream.isCurrentlyLive,
+    isRecorded: stream.isRecorded,
     label: stream.isCurrentlyLive
       ? 'Live Now'
+      : stream.isRecorded || stream.status === 'recorded'
+      ? 'Live Recorded'
       : stream.status === 'error'
       ? 'Service Error'
       : 'Offline / Awaiting Aarti',
