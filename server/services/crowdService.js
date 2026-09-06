@@ -228,12 +228,78 @@ setInterval(() => {
   runSimulationCycle();
 }, 8000);
 
+let liveEdgeTelemetry = null;
+let lastEdgeFetchTime = 0;
+
+/**
+ * Attempt to fetch real-time CCTV telemetry from the Python Edge Microservice
+ */
+async function syncEdgeTelemetry() {
+  const now = Date.now();
+  if (now - lastEdgeFetchTime < 1500 && liveEdgeTelemetry) {
+    return liveEdgeTelemetry;
+  }
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1000);
+    const res = await fetch("http://127.0.0.1:8000/api/cctv/telemetry", {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.mode === "LIVE_AI_INFERENCE") {
+        liveEdgeTelemetry = data;
+        lastEdgeFetchTime = now;
+        
+        // Update global telemetry state to reflect real AI inference
+        telemetryState.dataSource = "LIVE AI INFERENCE (YOLOv8 + ByteTrack)";
+        telemetryState.isLiveAI = true;
+        telemetryState.edgeNodeStatus = "ONLINE";
+        telemetryState.liveHeadcount = data.headcount;
+        telemetryState.liveFps = data.fps;
+        telemetryState.liveLatencyMs = data.latencyMs;
+
+        // Update active camera for Somnath Gate 1
+        const somnath = telemetryState.templeOverview.find(t => t.templeId === "somnath");
+        if (somnath && somnath.zones) {
+          const entryZone = somnath.zones.find(z => z.cctvNode === "CCTV-SOM-01" || z.id === "som-z1");
+          if (entryZone && data.zones && data.zones[0]) {
+            entryZone.headcount = data.zones[0].headcount;
+            entryZone.currentDensity = data.zones[0].density;
+            entryZone.status = data.zones[0].status;
+          }
+        }
+        return liveEdgeTelemetry;
+      }
+    }
+  } catch (err) {
+    // Edge service not running — retain simulation fallback
+  }
+  liveEdgeTelemetry = null;
+  telemetryState.dataSource = "Simulation / Demo Telemetry";
+  telemetryState.isLiveAI = false;
+  telemetryState.edgeNodeStatus = "OFFLINE_FALLBACK";
+  return null;
+}
+
 export const crowdService = {
   /**
    * Get complete aggregate crowd intelligence telemetry
    */
   async getLiveCrowd() {
-    return telemetryState;
+    await syncEdgeTelemetry();
+    return {
+      ...telemetryState,
+      edgeTelemetry: liveEdgeTelemetry
+    };
+  },
+
+  /**
+   * Get live edge CCTV telemetry directly
+   */
+  async getEdgeTelemetry() {
+    return await syncEdgeTelemetry();
   },
 
   /**
@@ -241,6 +307,7 @@ export const crowdService = {
    */
   async getCrowdByTempleId(templeId) {
     if (!templeId) return null;
+    await syncEdgeTelemetry();
     const cleanId = templeId.toLowerCase();
     const overview = telemetryState.templeOverview.find(
       (t) => t.templeId.toLowerCase() === cleanId
@@ -256,8 +323,12 @@ export const crowdService = {
         hour: h.hour,
         density: h[cleanId] || h.overall,
       })),
-      dataSource: "Simulation / Demo Telemetry",
-      notice: "Simulation / Demo Telemetry — Not live CCTV video streaming.",
+      dataSource: telemetryState.isLiveAI ? "LIVE AI INFERENCE (YOLOv8 + ByteTrack)" : "Simulation / Demo Telemetry",
+      isLiveAI: telemetryState.isLiveAI,
+      notice: telemetryState.isLiveAI 
+        ? "Connected to Live Edge AI YOLOv8 + ByteTrack Computer Vision Node." 
+        : "Simulation / Demo Telemetry — Not live CCTV video streaming.",
+      edgeTelemetry: cleanId === "somnath" ? liveEdgeTelemetry : null
     };
   },
 
@@ -266,8 +337,13 @@ export const crowdService = {
    * Allows external Python AI microservice to push edge detection metrics
    */
   async ingestEdgeTelemetry(telemetryPayload) {
-    const { templeId, zoneId, density, headcount } = telemetryPayload;
-    console.log(`📡 [Edge Ingestion] Received AI inference telemetry for ${templeId}/${zoneId}: ${headcount} pax (${density}%)`);
+    const { templeId, zoneId, density, headcount, fps, latencyMs, alerts } = telemetryPayload;
+    liveEdgeTelemetry = telemetryPayload;
+    lastEdgeFetchTime = Date.now();
+    telemetryState.dataSource = "LIVE AI INFERENCE (YOLOv8 + ByteTrack)";
+    telemetryState.isLiveAI = true;
+    telemetryState.edgeNodeStatus = "ONLINE";
+    console.log(`📡 [Edge Ingestion] Received AI inference telemetry for ${templeId || 'default'}/${zoneId || 'entry'}: ${headcount} pax (${density || 0}%)`);
     return { success: true, timestamp: new Date().toISOString() };
   },
 
@@ -278,3 +354,4 @@ export const crowdService = {
     return runSimulationCycle();
   },
 };
+

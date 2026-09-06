@@ -31,3 +31,32 @@ export const simulateCrowd = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getCctvTelemetry = async (req, res, next) => {
+  try {
+    const telemetry = await crowdService.getEdgeTelemetry();
+    return sendSuccess(res, telemetry || {
+      mode: "DEMO_SIMULATION",
+      status: "OFFLINE_FALLBACK",
+      headcount: 42,
+      fps: 30,
+      latencyMs: 42,
+      camera: "Gate 1 Main Entry",
+      detectedBoxes: [],
+      zones: [],
+      alerts: []
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const ingestCctvTelemetry = async (req, res, next) => {
+  try {
+    const result = await crowdService.ingestEdgeTelemetry(req.body);
+    return sendSuccess(res, result, "Edge CCTV telemetry ingested successfully");
+  } catch (error) {
+    next(error);
+  }
+};
+

@@ -1,0 +1,6 @@
+=== Duplicates in Roboflow Filtered Pedestrian ===
+MD5 b76f7d7c6d75df1b348e3fd4e7b53749 (2 copies): ['test/images/2008_000640_jpg.rf.4b479f96a874191227f0091464337232.jpg', 'train/images/2008_000640_jpg.rf.0f46da32cfa02f87a8cf356466908afa.jpg']
+=== Duplicates in Kaggle Human Detection Dataset ===
+MD5 f8a0a123e5ab1e51b0ebc01b6f8a6901 (2 copies): ['human detection dataset/0/161.png', 'human detection dataset/0/205.png']
+MD5 0a8fb24d6628696bf5a52029954ed804 (2 copies): ['human detection dataset/0/162.png', 'human detection dataset/1/394.png']
+MD5 28e290134c452c62de8d5dcef7ef715d (2 copies): ['human detection dataset/1/214.png', 'human detection dataset/1/244.png']

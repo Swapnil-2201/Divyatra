@@ -1,0 +1,73 @@
+DivYatra CCTV Dataset Audit Report
+Auditor: DivYatra AI Computer Vision Subsystem
+
+--------------------------------------------------
+DATASET: Roboflow Filtered Pedestrian
+Archive: Filtered Pedestrian.v1i.yolov8.zip
+Domain: RGB CCTV / Street Pedestrian
+Expected Format: YOLOv8 bounding boxes
+Archive Size: 371.37 MB
+Total Image Files: 4914
+Total Label Files: 4914
+Data Splits: {'test': 715, 'train': 3196, 'validation': 1003}
+Metadata files detected: ['data.yaml', 'data.yaml', 'data.yaml', 'README.roboflow.txt', 'README.dataset.txt']
+  [data.yaml]: train: ../train/images | val: ../valid/images | test: ../test/images
+  [data.yaml]: train: ../train/images | val: ../valid/images | test: ../test/images
+  [data.yaml]: train: ../train/images | val: ../valid/images | test: ../test/images
+  [README.roboflow.txt]:  | Filtered Pedestrian - v1 2026-09-06 12:38pm | ==============================
+  [README.dataset.txt]: # Filtered Pedestrian > 2026-09-06 12:38pm | https://universe.roboflow.com/tanish-singh/filtered-pedestrian-flnvd | 
+Sampled Images Checked for Integrity: 3000
+Corrupted Images: 0
+Color Modes: {'RGB': 3000}
+Image Resolution Stats: Min (180x146), Max (4624x3468), Mean (701x497)
+Duplicate Image Sets Detected: 1
+Total Bounding Boxes: 29400
+Classes Found: {'0': 29400}
+Empty Label Files (Background samples): 0
+Images Missing Matching Label: 0
+Out-of-Bounds/Invalid Bounding Boxes: 0
+
+
+--------------------------------------------------
+DATASET: Kaggle Thermal Images for Human Detection
+Archive: Thermal Images For Human Detection.zip
+Domain: Thermal Infrared
+Expected Format: YOLO bounding boxes
+Archive Size: 1310.64 MB
+Total Image Files: 15486
+Total Label Files: 15486
+Data Splits: {'test': 3463, 'train': 12023}
+Metadata files detected: []
+Sampled Images Checked for Integrity: 3000
+Corrupted Images: 0
+Color Modes: {'RGB': 3000}
+Image Resolution Stats: Min (1280x1024), Max (1280x1024), Mean (1280x1024)
+Duplicate Image Sets Detected: 0
+Total Bounding Boxes: 42437
+Classes Found: {'0': 42437}
+Empty Label Files (Background samples): 0
+Images Missing Matching Label: 0
+Out-of-Bounds/Invalid Bounding Boxes: 5
+
+
+--------------------------------------------------
+DATASET: Kaggle Human Detection Dataset
+Archive: Human Detection Dataset.zip
+Domain: RGB Web / Scene Images
+Expected Format: Binary Classification (0/1)
+Archive Size: 259.72 MB
+Total Image Files: 921
+Total Label Files: 0
+Data Splits: {'class_0_no_human': 362, 'class_1_human': 559}
+Metadata files detected: []
+Sampled Images Checked for Integrity: 921
+Corrupted Images: 0
+Color Modes: {'RGB': 859, 'RGBA': 62}
+Image Resolution Stats: Min (256x256), Max (4000x3000), Mean (537x516)
+Duplicate Image Sets Detected: 3
+Total Bounding Boxes: 0
+Classes Found: {}
+Empty Label Files (Background samples): 0
+Images Missing Matching Label: 559
+Out-of-Bounds/Invalid Bounding Boxes: 0
+

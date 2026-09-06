@@ -110,6 +110,8 @@ export const api = {
   getCrowdStatus: (templeId) => crowdService.getCrowdStatus(templeId),
   getHourlyPredictions: () => crowdService.getHourlyPredictions(),
   triggerCrowdSimulation: () => crowdService.simulateCrowdTelemetry(),
+  getCctvTelemetry: () => crowdService.getCctvTelemetry(),
+
 
   // ── Darshan Pass Booking ────────────────────────────────────────────────
   getDarshanSlots: (templeId, date) => bookingService.getDarshanSlots(templeId, date),

@@ -45,3 +45,17 @@ client/android/.externalNativeBuild/
 
 # Duplicate raw assets
 client/src/assets/Temple 3D models/
+
+# AI Datasets, Cache & Training Checkpoints
+*.zip
+cctv_ai/dataset/
+cctv_ai/runs/
+runs/
+weights/
+yolov8n.pt
+cctv_ai/models/last.pt
+cctv_ai/__pycache__/
+cctv_service/__pycache__/
+dataset_audit/sample_labels/
+*.pyc
+desktop.ini

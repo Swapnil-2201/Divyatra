@@ -1,0 +1,117 @@
+{
+  "status": "PASSED",
+  "framesProcessed": 30,
+  "uniqueTrackingIds": 74,
+  "persistentTracks": 58,
+  "sampleFinalTelemetry": {
+    "mode": "LIVE_AI_INFERENCE",
+    "model": "best.pt",
+    "device": "0",
+    "camera": "Gate 1 Main Entry",
+    "headcount": 4,
+    "fps": 77.0,
+    "latencyMs": 8.3,
+    "inferenceLatencyMs": 7.9,
+    "trackingLatencyMs": 0.4,
+    "timestamp": "2026-09-06T09:56:58Z",
+    "detectedBoxes": [
+      {
+        "id": 171,
+        "trackingId": "#PIL-171",
+        "confidence": "0.83",
+        "top": 37.45,
+        "left": 58.43,
+        "width": 9.04,
+        "height": 44.06,
+        "speed": 0.0,
+        "direction": "STATIONARY",
+        "motionVector": {
+          "vx": 0.0,
+          "vy": 0.0
+        }
+      },
+      {
+        "id": 172,
+        "trackingId": "#PIL-172",
+        "confidence": "0.73",
+        "top": 37.62,
+        "left": 66.29,
+        "width": 10.07,
+        "height": 45.82,
+        "speed": 0.0,
+        "direction": "STATIONARY",
+        "motionVector": {
+          "vx": 0.0,
+          "vy": 0.0
+        }
+      },
+      {
+        "id": 173,
+        "trackingId": "#PIL-173",
+        "confidence": "0.57",
+        "top": 35.72,
+        "left": 73.96,
+        "width": 9.13,
+        "height": 48.68,
+        "speed": 0.0,
+        "direction": "STATIONARY",
+        "motionVector": {
+          "vx": 0.0,
+          "vy": 0.0
+        }
+      },
+      {
+        "id": 174,
+        "trackingId": "#PIL-174",
+        "confidence": "0.54",
+        "top": 37.85,
+        "left": 79.56,
+        "width": 11.6,
+        "height": 49.32,
+        "speed": 0.0,
+        "direction": "STATIONARY",
+        "motionVector": {
+          "vx": 0.0,
+          "vy": 0.0
+        }
+      }
+    ],
+    "zones": [
+      {
+        "id": "zone-entry",
+        "name": "Main Entry Turnstiles",
+        "headcount": 0,
+        "capacity": 30,
+        "density": 0,
+        "status": "LOW",
+        "statusColor": "emerald",
+        "threshold": 75,
+        "avgSpeed": 0.0
+      },
+      {
+        "id": "zone-queue",
+        "name": "Central Sabhamandap Queue",
+        "headcount": 2,
+        "capacity": 45,
+        "density": 4,
+        "status": "LOW",
+        "statusColor": "emerald",
+        "threshold": 70,
+        "avgSpeed": 0.0
+      },
+      {
+        "id": "zone-sanctum",
+        "name": "Inner Sanctum Altar Corridor",
+        "headcount": 2,
+        "capacity": 25,
+        "density": 8,
+        "status": "LOW",
+        "statusColor": "emerald",
+        "threshold": 80,
+        "avgSpeed": 0.0
+      }
+    ],
+    "alerts": [],
+    "privacyNotice": "Privacy Protected (Zero PII Retained) \u2014 Anonymous temporary session tracks only."
+  }
+}

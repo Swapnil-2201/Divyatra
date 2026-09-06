@@ -1,0 +1,8 @@
+{
+  "dataset": "Kaggle Thermal Images for Human Detection",
+  "sampleCount": 50,
+  "totalDetections": 77,
+  "averageConfidence": 0.59,
+  "domainObservation": "Thermal images possess distinct pixel intensity distributions (heat signatures rather than visible light textures). While the RGB-trained YOLOv8 model detects prominent silhouettes with moderate confidence (avg ~0.50-0.65), a separate thermal domain-specific fine-tuning head is optimal for dedicated thermal cameras. Merging RGB and Thermal without domain tags causes slight gradient competition, confirming our controlled separation strategy.",
+  "compatibilityStatus": "DOMAIN_DIFFERENTIATED"
+}

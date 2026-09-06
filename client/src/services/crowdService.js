@@ -79,5 +79,23 @@ export const crowdService = {
     }
     currentTelemetryState = generateSimulatedCrowdPulse(currentTelemetryState);
     return currentTelemetryState;
+  },
+
+  /**
+   * Fetch real-time CCTV AI telemetry from edge node or server
+   */
+  async getCctvTelemetry() {
+    try {
+      const res = await fetch(`${BASE_URL}/crowd/cctv-telemetry`);
+
+      if (res.ok) {
+        const json = await res.json();
+        return json.data;
+      }
+    } catch (err) {
+      // Graceful fallback
+    }
+    return null;
   }
 };
+
