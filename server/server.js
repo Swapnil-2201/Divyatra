@@ -43,6 +43,13 @@ const io = new SocketIOServer(httpServer, {
   },
 });
 
+import {
+  validateSessionToken,
+  markSessionConnected,
+  terminateCctvSession,
+  getSessionByToken
+} from "./services/cctvSessionService.js";
+
 setIoInstance(io);
 
 io.on("connection", (socket) => {
@@ -66,8 +73,89 @@ io.on("connection", (socket) => {
     socket.emit("authority_connected", { status: "AUTHORITY_ONLINE" });
   });
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // CCTV WebRTC Signaling Handlers (Admin Laptop <-> Phone Camera Publisher)
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  socket.on("cctv_admin_join", ({ token }) => {
+    if (!token) return;
+    const room = `cctv_${token}`;
+    socket.join(room);
+    socket.cctvToken = token;
+    socket.cctvRole = "admin";
+    console.log(`📹 [CCTV WebRTC] Admin socket ${socket.id} joined session room ${room}`);
+  });
+
+  socket.on("cctv_phone_join", ({ token, camera }) => {
+    if (!token) {
+      socket.emit("cctv_error", { error: "NO_TOKEN", message: "No session token provided" });
+      return;
+    }
+
+    const validation = validateSessionToken(token);
+    if (!validation.valid) {
+      socket.emit("cctv_error", { error: validation.error, message: "Invalid or expired session token" });
+      return;
+    }
+
+    const session = validation.session;
+    markSessionConnected(token, socket.id);
+
+    const room = `cctv_${token}`;
+    socket.join(room);
+    socket.cctvToken = token;
+    socket.cctvRole = "phone";
+    console.log(`📱 [CCTV WebRTC] Phone socket ${socket.id} joined session room ${room} for camera ${session.cameraName}`);
+
+    socket.emit("cctv_joined", {
+      status: "CONNECTED",
+      cameraName: session.cameraName,
+      cameraId: session.cameraId,
+      sessionId: session.sessionId
+    });
+
+    // Notify Admin peer that Phone camera is ready for WebRTC negotiation
+    socket.to(room).emit("cctv_phone_ready", {
+      cameraName: session.cameraName,
+      cameraId: session.cameraId,
+      sessionId: session.sessionId
+    });
+  });
+
+  socket.on("cctv_signal", ({ token, signal }) => {
+    if (!token || !signal) return;
+    const room = `cctv_${token}`;
+    // Relay SDP Offer or Answer to the other peer in the room
+    socket.to(room).emit("cctv_signal", { signal, sender: socket.id });
+  });
+
+  socket.on("cctv_ice_candidate", ({ token, candidate }) => {
+    if (!token || !candidate) return;
+    const room = `cctv_${token}`;
+    // Relay ICE candidate to the other peer in the room
+    socket.to(room).emit("cctv_ice_candidate", { candidate, sender: socket.id });
+  });
+
+  socket.on("cctv_session_terminate", ({ token }) => {
+    if (!token) return;
+    terminateCctvSession(token);
+    const room = `cctv_${token}`;
+    io.to(room).emit("cctv_session_terminated", {
+      reason: "ADMIN_TERMINATED",
+      message: "The CCTV session was disconnected by the administrator."
+    });
+    console.log(`🛑 [CCTV WebRTC] Dispatched session termination for room ${room}`);
+  });
+
   socket.on("disconnect", () => {
     console.log(`🔌 [Socket.IO] Client disconnected: ${socket.id}`);
+    if (socket.cctvToken) {
+      const room = `cctv_${socket.cctvToken}`;
+      socket.to(room).emit("cctv_peer_disconnected", {
+        role: socket.cctvRole || "peer",
+        sender: socket.id
+      });
+    }
   });
 });
 

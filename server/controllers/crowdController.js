@@ -1,4 +1,9 @@
 import { crowdService } from "../services/crowdService.js";
+import {
+  createCctvSession,
+  validateSessionToken,
+  terminateCctvSession
+} from "../services/cctvSessionService.js";
 import { sendSuccess, sendError } from "../utils/responseHelper.js";
 
 export const getLiveCrowd = async (req, res, next) => {
@@ -55,6 +60,69 @@ export const ingestCctvTelemetry = async (req, res, next) => {
   try {
     const result = await crowdService.ingestEdgeTelemetry(req.body);
     return sendSuccess(res, result, "Edge CCTV telemetry ingested successfully");
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Creates a new temporary CCTV phone session (Admin only)
+ */
+export const createCctvSessionHandler = async (req, res, next) => {
+  try {
+    const { cameraId, cameraName, templeId } = req.body;
+    const session = createCctvSession({
+      cameraId: cameraId || "cam-01",
+      cameraName: cameraName || "Gate 01 Main Entry",
+      templeId: templeId || "somnath"
+    });
+    return sendSuccess(res, {
+      sessionId: session.sessionId,
+      token: session.token,
+      expiresAt: session.expiresAt,
+      cameraId: session.cameraId,
+      cameraName: session.cameraName,
+      templeId: session.templeId,
+      status: session.status
+    }, "Temporary camera session created");
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Validates a single-purpose CCTV session token (Used by phone publisher)
+ */
+export const validateCctvSessionHandler = async (req, res, next) => {
+  try {
+    const token = req.query.token || req.headers["x-cctv-token"];
+    const validation = validateSessionToken(token);
+    if (!validation.valid) {
+      return sendError(res, validation.error, 403);
+    }
+    const { sessionId, cameraId, cameraName, templeId, expiresAt, status } = validation.session;
+    return sendSuccess(res, {
+      valid: true,
+      sessionId,
+      cameraId,
+      cameraName,
+      templeId,
+      expiresAt,
+      status
+    }, "Session token valid");
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Terminates an active CCTV session
+ */
+export const terminateCctvSessionHandler = async (req, res, next) => {
+  try {
+    const { token, sessionId } = req.body;
+    const session = terminateCctvSession(token || sessionId);
+    return sendSuccess(res, { terminated: true, sessionId: session?.sessionId }, "Camera session terminated");
   } catch (error) {
     next(error);
   }

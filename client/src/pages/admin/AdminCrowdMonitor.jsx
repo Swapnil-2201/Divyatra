@@ -132,7 +132,7 @@ export const AdminCrowdMonitor = () => {
 
       {/* Main CCTV Stream Preview */}
       {selectedTemple && (
-        <SimulatedCCTVStream cams={selectedTemple.cctvCams} templeName={selectedTemple.name} />
+        <SimulatedCCTVStream cams={selectedTemple.cctvCams} templeName={selectedTemple.name} isAdmin={true} />
       )}
 
       {/* Zone-by-Zone Breakdown & Diagnostics */}

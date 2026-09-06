@@ -37,6 +37,7 @@ const AdminAlerts = lazy(() => import('./pages/admin/AdminAlerts').then(m => ({ 
 const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics').then(m => ({ default: m.AdminAnalytics })));
 const AdminEmergency = lazy(() => import('./pages/admin/AdminEmergency').then(m => ({ default: m.AdminEmergency })));
 const DivyatraAdministration = lazy(() => import('./pages/admin/DivyatraAdministration').then(m => ({ default: m.DivyatraAdministration })));
+const MobileCCTVPublisher = lazy(() => import('./pages/admin/MobileCCTVPublisher').then(m => ({ default: m.MobileCCTVPublisher })));
 
 /**
  * Lightweight Route Suspense Fallback
@@ -135,6 +136,9 @@ export function App() {
                   {/* Standalone Administration & State Command Matrix Login */}
                   <Route path="/DivyatraAdministration" element={<DivyatraAdministration />} />
                   <Route path="/admin/login" element={<DivyatraAdministration />} />
+
+                  {/* Temporary Single-Purpose Phone CCTV Publisher (Token-guarded, no admin credentials required) */}
+                  <Route path="/admin/cctv/mobile" element={<MobileCCTVPublisher />} />
 
                   {/* Authority / Admin Command Center Routes (Guarded) */}
                   <Route
