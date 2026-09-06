@@ -40,7 +40,6 @@ const YOUTUBE_HEADERS = {
   'User-Agent':
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
   'Accept-Language': 'en-US,en;q=0.9',
-  'Cookie': 'CONSENT=YES+cb.20210328-17-p0.en+FX+999; SOCS=CAESEwgDEgk0ODEzNzk5NDQaAmVuIAEaBgiA_LyaBg',
 };
 
 /**
@@ -54,12 +53,15 @@ async function verifyVideoIsLive(videoId) {
   try {
     const res = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
       headers: YOUTUBE_HEADERS,
+      redirect: 'follow',
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return { isLive: false };
 
     const html = await res.text();
-    const pm = html.match(/ytInitialPlayerResponse\s*=\s*({.+?});/s);
+    const pm =
+      html.match(/ytInitialPlayerResponse\s*=\s*({.+?});/s) ||
+      html.match(/ytInitialPlayerResponse\s*=\s*({.+?})<\/script>/s);
     if (!pm) return { isLive: false };
 
     const p = JSON.parse(pm[1]);
@@ -87,6 +89,36 @@ async function verifyVideoIsLive(videoId) {
   } catch (e) {
     return { isLive: false, error: e.message };
   }
+}
+
+/**
+ * Robust, language-agnostic extraction of live stream candidate from channel /streams HTML.
+ * Parses lockupViewModel and videoRenderer blocks directly for LIVE badges.
+ */
+function extractLiveFromStreamsHtml(html) {
+  if (!html) return null;
+  const isLiveCandidate =
+    html.includes('THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE') ||
+    html.includes('BADGE_STYLE_TYPE_LIVE_NOW') ||
+    html.includes('"text":"LIVE"');
+  if (!isLiveCandidate) return null;
+
+  const chunks = html.split(/lockupViewModel|videoRenderer/);
+  for (const chunk of chunks) {
+    const hasLiveBadge =
+      chunk.includes('THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE') ||
+      chunk.includes('BADGE_STYLE_TYPE_LIVE_NOW') ||
+      chunk.includes('"text":"LIVE"');
+    const isUpcoming = chunk.includes('"Upcoming"') || chunk.includes('"text":"Upcoming"');
+    if (hasLiveBadge && !isUpcoming) {
+      const idMatch = chunk.match(/"(contentId|videoId)":"([a-zA-Z0-9_-]{11})"/);
+      const titleMatch = chunk.match(/"(title|content)":"([^"]+)"/);
+      if (idMatch && idMatch[2]) {
+        return { videoId: idMatch[2], title: titleMatch?.[2] || null };
+      }
+    }
+  }
+  return null;
 }
 
 /**
@@ -130,7 +162,7 @@ async function checkYouTubeChannelLive(channelInfo) {
   }
 
   // -----------------------------------------------------------------
-  // Tier 2: Channel /streams tab scan (parses live badges)
+  // Tier 2: Channel /streams tab scan (Direct LIVE badge extraction)
   // -----------------------------------------------------------------
   const streamsUrls = [];
   if (handle) streamsUrls.push(`https://www.youtube.com/${handle.startsWith('@') ? handle : '@' + handle}/streams`);
@@ -138,63 +170,24 @@ async function checkYouTubeChannelLive(channelInfo) {
 
   for (const sUrl of streamsUrls) {
     try {
-      const res = await fetch(sUrl, { headers: YOUTUBE_HEADERS, signal: AbortSignal.timeout(6000) });
+      const res = await fetch(sUrl, {
+        headers: YOUTUBE_HEADERS,
+        redirect: 'follow',
+        signal: AbortSignal.timeout(6000),
+      });
       if (!res.ok) continue;
 
       const html = await res.text();
-      const m = html.match(/ytInitialData\s*=\s*({.+?});/);
-      if (m) {
-        const data = JSON.parse(m[1]);
-        const tab = data?.contents?.twoColumnBrowseResultsRenderer?.tabs?.find(
-          (t) => t.tabRenderer?.title === 'Live' || t.tabRenderer?.title === 'Streams'
-        );
-        const richGrid = tab?.tabRenderer?.content?.richGridRenderer;
-        if (richGrid?.contents) {
-          for (const item of richGrid.contents) {
-            // Check lockupViewModel (modern YouTube layout)
-            const vm = item.richItemRenderer?.content?.lockupViewModel;
-            if (vm && vm.contentId) {
-              const overlays = vm.contentImage?.thumbnailViewModel?.overlays || [];
-              const badges = overlays[0]?.thumbnailBottomOverlayViewModel?.badges || [];
-              const badgeText = badges[0]?.thumbnailBadgeViewModel?.text;
-              const badgeStyle = badges[0]?.thumbnailBadgeViewModel?.badgeStyle;
-              const isLiveBadge = badgeText === 'LIVE' || badgeStyle === 'THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE';
-
-              if (isLiveBadge) {
-                const title = vm.metadata?.lockupMetadataViewModel?.title?.content;
-                const check = await verifyVideoIsLive(vm.contentId);
-                if (check.isLive) {
-                  return {
-                    isLive: true,
-                    videoId: vm.contentId,
-                    streamTitle: check.title || title || defaultTitle,
-                    status: 'live',
-                  };
-                }
-              }
-            }
-
-            // Check videoRenderer (classic YouTube layout)
-            const vr = item.videoRenderer || item.richItemRenderer?.content?.videoRenderer;
-            if (vr && vr.videoId) {
-              const vrBadges = vr.badges || [];
-              const hasLiveBadge = vrBadges.some(
-                (b) => b.metadataBadgeRenderer?.style === 'BADGE_STYLE_TYPE_LIVE_NOW' || b.metadataBadgeRenderer?.label === 'LIVE'
-              );
-              if (hasLiveBadge) {
-                const title = vr.title?.runs?.[0]?.text;
-                const check = await verifyVideoIsLive(vr.videoId);
-                if (check.isLive) {
-                  return {
-                    isLive: true,
-                    videoId: vr.videoId,
-                    streamTitle: check.title || title || defaultTitle,
-                    status: 'live',
-                  };
-                }
-              }
-            }
-          }
+      const candidate = extractLiveFromStreamsHtml(html);
+      if (candidate && candidate.videoId) {
+        const check = await verifyVideoIsLive(candidate.videoId);
+        if (check.isLive) {
+          return {
+            isLive: true,
+            videoId: candidate.videoId,
+            streamTitle: check.title || candidate.title || defaultTitle,
+            status: 'live',
+          };
         }
       }
     } catch (streamsErr) {
