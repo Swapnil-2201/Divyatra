@@ -405,6 +405,7 @@ export const BookingPage = () => {
               <div className="space-y-2.5 sm:space-y-3">
                 {samplePrasadItems.map((item) => {
                   const inCart = draftBooking.prasadCart.find((p) => p.id === item.id);
+                  const localizedName = t(`prasadItems.${item.id}.name`, { defaultValue: item.name });
                   return (
                     <div
                       key={item.id}
@@ -413,11 +414,11 @@ export const BookingPage = () => {
                       <div className="flex items-center gap-3">
                         <img
                           src={item.image}
-                          alt={item.name}
+                          alt={localizedName}
                           className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl object-cover"
                         />
                         <div>
-                          <strong className="text-xs sm:text-sm font-bold text-[#102A56] block">{item.name}</strong>
+                          <strong className="text-xs sm:text-sm font-bold text-[#102A56] block">{localizedName}</strong>
                           <span className="text-xs font-semibold text-[#E97820]">₹{item.price}</span>
                         </div>
                       </div>
@@ -436,7 +437,7 @@ export const BookingPage = () => {
                       ) : (
                         <button
                           type="button"
-                          onClick={() => addPrasadToDraft(item, 1)}
+                          onClick={() => addPrasadToDraft({ ...item, name: localizedName }, 1)}
                           className="w-full xs:w-auto px-4 py-2 rounded-xl bg-[#102A56] text-white hover:bg-[#1B3B74] text-xs font-bold flex items-center justify-center gap-1.5 transition-colors min-h-[38px]"
                         >
                           <Plus className="w-3.5 h-3.5" />
