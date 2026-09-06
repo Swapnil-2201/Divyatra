@@ -1,7 +1,7 @@
 import React from 'react';
 import { Shield, Users, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
 
-export const ZoneCongestionMap = ({ zones = [], templeName = "Somnath" }) => {
+export const ZoneCongestionMap = ({ zones = [], templeName = "Somnath", columns = "grid-cols-1 sm:grid-cols-2" }) => {
   return (
     <div className="bg-white rounded-3xl border border-[#E5DED0] p-4 sm:p-6 shadow-luxury space-y-4 sm:space-y-6">
       
@@ -18,7 +18,7 @@ export const ZoneCongestionMap = ({ zones = [], templeName = "Somnath" }) => {
       </div>
 
       {/* Zones Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className={`grid ${columns} gap-4`}>
         {zones.map((zone) => {
           const isHigh = zone.density >= 75;
           const isMed = zone.density >= 45 && zone.density < 75;
