@@ -1,17 +1,68 @@
 /**
  * @file iotApi.js
  * @description REST API client for DivYatra IoT Smart Band Simulator
+ * Supports dynamic Gateway URL configuration (Localhost, Cloud Vercel, or custom)
  */
 
-const BASE_URL = import.meta.env.VITE_API_URL || '/api';
+export const getGatewayUrl = () => {
+  if (typeof window !== 'undefined') {
+    const custom = localStorage.getItem('divyatra_iot_gateway_url');
+    if (custom && custom.trim()) {
+      return custom.trim().replace(/\/+$/, '');
+    }
+  }
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl && envUrl.trim()) {
+    return envUrl.trim().replace(/\/+$/, '');
+  }
+  return '/api';
+};
+
+export const setGatewayUrl = (url) => {
+  if (typeof window !== 'undefined') {
+    if (!url || !url.trim()) {
+      localStorage.removeItem('divyatra_iot_gateway_url');
+    } else {
+      localStorage.setItem('divyatra_iot_gateway_url', url.trim().replace(/\/+$/, ''));
+    }
+  }
+};
+
+export const resetGatewayUrl = () => {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('divyatra_iot_gateway_url');
+  }
+};
 
 export const iotApi = {
+  getGatewayUrl,
+  setGatewayUrl,
+  resetGatewayUrl,
+
+  /**
+   * Ping Gateway health and measure roundtrip latency
+   */
+  async pingGateway() {
+    const start = performance.now();
+    try {
+      const url = `${getGatewayUrl()}/iot/bands`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+      const latencyMs = Math.round(performance.now() - start);
+      if (res.ok) {
+        return { online: true, latencyMs, url: getGatewayUrl() };
+      }
+      return { online: false, latencyMs, status: res.status, url: getGatewayUrl() };
+    } catch (err) {
+      return { online: false, error: err.message, url: getGatewayUrl() };
+    }
+  },
+
   /**
    * Fetch complete band state (Cold start & periodic sync)
    */
   async getBandState(bandId = 'DV-BAND-0001') {
     try {
-      const res = await fetch(`${BASE_URL}/iot/band/${bandId}/state`);
+      const res = await fetch(`${getGatewayUrl()}/iot/band/${bandId}/state`);
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const json = await res.json();
       return json.data;
@@ -22,11 +73,30 @@ export const iotApi = {
   },
 
   /**
+   * Sync a newly issued pass directly to the band
+   */
+  async syncPass(bandId = 'DV-BAND-0001', passData = {}) {
+    try {
+      const res = await fetch(`${getGatewayUrl()}/iot/band/${bandId}/pass`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(passData),
+      });
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const json = await res.json();
+      return json.data;
+    } catch (err) {
+      console.warn('⚠️ [API] Pass sync call failed:', err.message);
+      return { success: true, local: true, ...passData };
+    }
+  },
+
+  /**
    * Acknowledge pass on wristband
    */
   async acknowledgePass(bandId = 'DV-BAND-0001') {
     try {
-      const res = await fetch(`${BASE_URL}/iot/band/${bandId}/acknowledge`, {
+      const res = await fetch(`${getGatewayUrl()}/iot/band/${bandId}/acknowledge`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -44,7 +114,7 @@ export const iotApi = {
    */
   async triggerEmergency(bandId = 'DV-BAND-0001', payload = {}) {
     try {
-      const res = await fetch(`${BASE_URL}/iot/band/${bandId}/emergency`, {
+      const res = await fetch(`${getGatewayUrl()}/iot/band/${bandId}/emergency`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -67,7 +137,7 @@ export const iotApi = {
    */
   async getBandEvents(bandId = 'DV-BAND-0001') {
     try {
-      const res = await fetch(`${BASE_URL}/iot/band/${bandId}/events`);
+      const res = await fetch(`${getGatewayUrl()}/iot/band/${bandId}/events`);
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const json = await res.json();
       return json.data || [];
@@ -81,7 +151,7 @@ export const iotApi = {
    */
   async resetBand(bandId = 'DV-BAND-0001') {
     try {
-      const res = await fetch(`${BASE_URL}/iot/band/${bandId}/reset`, {
+      const res = await fetch(`${getGatewayUrl()}/iot/band/${bandId}/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -99,7 +169,7 @@ export const iotApi = {
    */
   async simulateEvent(bandId = 'DV-BAND-0001', type = 'CROWD_ALERT') {
     try {
-      const res = await fetch(`${BASE_URL}/iot/band/${bandId}/simulate`, {
+      const res = await fetch(`${getGatewayUrl()}/iot/band/${bandId}/simulate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type }),
@@ -118,7 +188,7 @@ export const iotApi = {
    */
   async getCrowdTelemetry(templeId = 'somnath') {
     try {
-      const res = await fetch(`${BASE_URL}/crowd/${templeId}`);
+      const res = await fetch(`${getGatewayUrl()}/crowd/${templeId}`);
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const json = await res.json();
       return json.data;

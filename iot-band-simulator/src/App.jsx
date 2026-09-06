@@ -5,6 +5,7 @@ import { StationDiagnostics } from './components/StationDiagnostics';
 import { DemoControls } from './components/DemoControls';
 import { EmergencyModal } from './components/EmergencyModal';
 import { PassDetailsModal } from './components/PassDetailsModal';
+import { GatewayConfigModal } from './components/GatewayConfigModal';
 import {
   Radio,
   Sparkles,
@@ -23,9 +24,17 @@ const SimulatorContent = () => {
     battery,
     signalStrength,
     syncLatestState,
+    gatewayUrl,
+    gatewayHealth,
   } = useBand();
 
   const [activeTab, setActiveTab] = useState('both'); // 'wearable' | 'diagnostics' | 'both'
+  const [gatewayModalOpen, setGatewayModalOpen] = useState(false);
+
+  const pilgrimAppUrl =
+    typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+      ? 'https://divyatra.vercel.app'
+      : 'http://localhost:5173';
 
   return (
     <div className="min-h-screen bg-[#060B14] text-slate-100 flex flex-col justify-between selection:bg-[#E97820] selection:text-white">
@@ -58,6 +67,21 @@ const SimulatorContent = () => {
 
           {/* Status Indicators & Gateway State */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs">
+            {/* Gateway Switcher Button */}
+            <button
+              onClick={() => setGatewayModalOpen(true)}
+              title="Configure IoT Mesh Gateway Target"
+              className="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-mono flex items-center gap-1.5 transition-colors"
+            >
+              <Radio className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+              <span className="truncate max-w-[120px] sm:max-w-[170px]">
+                {gatewayUrl === '/api'
+                  ? 'Gateway: Auto (/api)'
+                  : `Gateway: ${gatewayUrl.replace('https://', '').replace('http://', '')}`}
+              </span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            </button>
+
             <button
               onClick={() => syncLatestState()}
               title="Refresh State from Backend"
@@ -77,7 +101,7 @@ const SimulatorContent = () => {
             </div>
 
             <a
-              href="http://localhost:5173"
+              href={pilgrimAppUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="px-3 py-1.5 rounded-xl bg-[#102A56] hover:bg-[#1A3A72] text-slate-200 hover:text-white border border-[#D5A63A]/20 text-[11px] font-semibold flex items-center gap-1.5 transition-colors"
@@ -169,6 +193,10 @@ const SimulatorContent = () => {
       {/* Modals */}
       <EmergencyModal />
       <PassDetailsModal />
+      <GatewayConfigModal
+        isOpen={gatewayModalOpen}
+        onClose={() => setGatewayModalOpen(false)}
+      />
     </div>
   );
 };

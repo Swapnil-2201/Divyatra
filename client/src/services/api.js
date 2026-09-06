@@ -206,6 +206,23 @@ export const api = {
     }
   },
 
+  async syncPassToIoTBand(bandId = 'DV-BAND-0001', passData = {}) {
+    try {
+      const res = await fetch(`${BASE_URL}/iot/band/${bandId}/pass`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(passData),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return json.data;
+      }
+    } catch (err) {
+      console.warn('⚠️ [Client IoT] Band sync notice:', err.message);
+    }
+    return null;
+  },
+
   // ── Live Darshan ────────────────────────────────────────────────────────
   getTempleLiveStream: (templeId) => getTempleLiveStream(templeId),
   getAllTempleLiveStreams: () => getAllTempleLiveStreams(),

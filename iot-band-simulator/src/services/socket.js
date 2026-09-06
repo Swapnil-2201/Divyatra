@@ -4,12 +4,28 @@
  */
 
 import { io } from 'socket.io-client';
+import { getGatewayUrl } from './iotApi';
 
-const WS_URL = import.meta.env.VITE_WS_URL || (
-  typeof window !== 'undefined'
-    ? `${window.location.protocol}//${window.location.hostname}:5001`
-    : 'http://localhost:5001'
-);
+const getWsUrl = () => {
+  const envWs = import.meta.env.VITE_WS_URL;
+  if (envWs && envWs.trim()) return envWs.trim();
+
+  const gw = getGatewayUrl();
+  if (gw && gw.startsWith('http')) {
+    try {
+      const parsed = new URL(gw);
+      return parsed.origin;
+    } catch (e) {}
+  }
+
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return `${window.location.protocol}//${window.location.hostname}:5001`;
+    }
+    return window.location.origin;
+  }
+  return 'http://localhost:5001';
+};
 
 let socket = null;
 
@@ -19,13 +35,16 @@ export const initSocket = (bandId = 'DV-BAND-0001', callbacks = {}) => {
     return socket;
   }
 
-  socket = io(WS_URL, {
+  const wsTarget = getWsUrl();
+  console.log(`🔌 [IoT Socket] Initializing connection to ${wsTarget}...`);
+
+  socket = io(wsTarget, {
     transports: ['websocket', 'polling'],
     reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 1000,
+    reconnectionAttempts: 10,
+    reconnectionDelay: 2000,
     reconnectionDelayMax: 5000,
-    timeout: 10000,
+    timeout: 8000,
   });
 
   socket.on('connect', () => {
@@ -73,7 +92,6 @@ export const initSocket = (bandId = 'DV-BAND-0001', callbacks = {}) => {
   });
 
   socket.on('connect_error', (error) => {
-    console.warn(`⚠️ [IoT Socket] Connection error (will auto-retry):`, error.message);
     callbacks.onConnectError?.(error);
   });
 
@@ -84,7 +102,9 @@ export const getSocket = () => socket;
 
 export const disconnectSocket = () => {
   if (socket) {
-    socket.disconnect();
+    try {
+      socket.disconnect();
+    } catch (e) {}
     socket = null;
   }
 };

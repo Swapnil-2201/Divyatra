@@ -138,6 +138,9 @@ export const PaymentPage = () => {
 
       saveConfirmedBooking(confirmedBooking);
 
+      // Dynamically synchronize pass with registered IoT Smart Band DV-BAND-0001
+      api.syncPassToIoTBand('DV-BAND-0001', confirmedBooking).catch(() => {});
+
       // Celebration confetti
       try {
         confetti({

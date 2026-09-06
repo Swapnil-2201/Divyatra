@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { iotApi } from '../services/iotApi';
 import { initSocket, disconnectSocket } from '../services/socket';
@@ -20,6 +20,18 @@ export const BandProvider = ({ children }) => {
   const [isNewPassAlert, setIsNewPassAlert] = useState(false);
   const [currentPilgrim, setCurrentPilgrim] = useState('Ramesh Patel');
   const [currentTemple, setCurrentTemple] = useState('Shree Somnath Jyotirlinga');
+
+  // Gateway Connection Info (Supports dynamic Vercel / Localhost / Custom routing)
+  const [gatewayUrl, setGatewayUrlState] = useState(iotApi.getGatewayUrl());
+  const [gatewayHealth, setGatewayHealth] = useState({ online: true, latencyMs: 24, lastChecked: new Date() });
+
+  // Refs to avoid stale closures in polling intervals
+  const currentPassRef = useRef(currentPass);
+  const emergencyActiveRef = useRef(false);
+
+  useEffect(() => {
+    currentPassRef.current = currentPass;
+  }, [currentPass]);
 
   // Simulated Telemetry (Fluctuates subtly over time - NOT medical data)
   const [telemetry, setTelemetry] = useState({
@@ -52,6 +64,10 @@ export const BandProvider = ({ children }) => {
   // Emergency Assistance Simulation State
   const [emergencyActive, setEmergencyActive] = useState(false);
   const [emergencyData, setEmergencyData] = useState(null);
+
+  useEffect(() => {
+    emergencyActiveRef.current = emergencyActive;
+  }, [emergencyActive]);
 
   // Active Screen inside the Smart Band: 'clock' | 'pass' | 'vitals' | 'crowd' | 'notifications' | 'sos'
   const [activeScreen, setActiveScreen] = useState('clock');
@@ -96,59 +112,20 @@ export const BandProvider = ({ children }) => {
     return () => clearInterval(vitalsTimer);
   }, [emergencyActive]);
 
-  // Sync state from Backend API (Cold Start handling)
-  const syncLatestState = useCallback(async () => {
-    const state = await iotApi.getBandState(bandId);
-    if (!state) return;
-
-    setConnectionStatus(state.connectionStatus || 'CONNECTED');
-    setBattery(state.battery || 87);
-    setSignalStrength(state.signalStrength || 'Strong');
-
-    if (state.currentPass && state.currentPass.bookingId) {
-      setCurrentPass(state.currentPass);
-      setCurrentPilgrim(state.currentPass.leadPilgrim || state.pilgrimInformation || 'Ramesh Patel');
-      setCurrentTemple(state.currentPass.templeName || 'Shree Somnath Jyotirlinga');
-
-      if (state.currentPass.status === 'ACTIVE') {
-        setPassStatus('PASS_ACTIVE');
-      } else {
-        setPassStatus('PASS_ISSUED');
-      }
-    }
-
-    if (state.crowdStatus) {
-      setCrowdStatus(state.crowdStatus);
-    }
-
-    if (state.emergencyStatus && state.emergencyStatus.active) {
-      setEmergencyActive(true);
-      setEmergencyData(state.emergencyStatus);
-    }
-
-    if (state.latestNotifications) {
-      setNotifications(state.latestNotifications);
-    }
-
-    if (state.events) {
-      setEvents(state.events);
-    }
-  }, [bandId]);
-
   // Handle incoming PASS_ISSUED real-time event
   const handlePassIssued = useCallback((passPayload) => {
     console.log('⚡ Processing PASS_ISSUED event in BandContext:', passPayload);
     const normalizedPass = {
-      bookingId: passPayload.bookingId,
+      bookingId: passPayload.bookingId || `BK-SOM-${Date.now().toString(36).toUpperCase()}`,
       templeId: passPayload.templeId || 'somnath',
       templeName: passPayload.templeName || 'Shree Somnath Jyotirlinga',
       date: passPayload.date || new Date().toISOString().split('T')[0],
-      slot: passPayload.slot || '10:00 AM',
-      pilgrims: Number(passPayload.pilgrims || 1),
-      leadPilgrim: passPayload.leadPilgrim || 'Ramesh Patel',
+      slot: passPayload.slot || passPayload.timeSlot || '10:00 AM',
+      pilgrims: Number(passPayload.pilgrims || passPayload.pilgrimCount || 1),
+      leadPilgrim: passPayload.leadPilgrim?.name || passPayload.leadPilgrim || 'Ramesh Patel',
       status: 'ISSUED',
-      qrPayload: passPayload.qrPayload || JSON.stringify(passPayload),
-      issuedAt: passPayload.timestamp || new Date().toISOString(),
+      qrPayload: passPayload.qrPayload || passPayload.qrCodeData || JSON.stringify(passPayload),
+      issuedAt: passPayload.timestamp || passPayload.issuedAt || new Date().toISOString(),
     };
 
     setCurrentPass(normalizedPass);
@@ -190,7 +167,86 @@ export const BandProvider = ({ children }) => {
     setEvents((prev) => [...newEvents, ...prev]);
   }, [triggerHaptic]);
 
-  // Initialize Socket.IO connection & listen for events
+  // Sync state from Backend / Vercel Serverless API (Active Heartbeat Polling)
+  const syncLatestState = useCallback(async () => {
+    try {
+      const state = await iotApi.getBandState(bandId);
+      if (!state) return;
+
+      setConnectionStatus(state.connectionStatus || 'CONNECTED');
+      setBattery(state.battery || 87);
+      setSignalStrength(state.signalStrength || 'Strong');
+
+      const prevPassId = currentPassRef.current?.bookingId;
+      const newPassId = state.currentPass?.bookingId;
+
+      // Detect dynamically booked pass arrival
+      if (newPassId && newPassId !== prevPassId) {
+        handlePassIssued(state.currentPass);
+      } else if (!newPassId && prevPassId) {
+        // Band was reset remotely
+        setCurrentPass(null);
+        setPassStatus('NO_PASS');
+        setIsNewPassAlert(false);
+      } else if (state.currentPass) {
+        // Update pass status (ACTIVE vs ISSUED)
+        if (state.currentPass.status === 'ACTIVE' && passStatus !== 'PASS_ACTIVE') {
+          setPassStatus('PASS_ACTIVE');
+        }
+      }
+
+      if (state.crowdStatus) {
+        setCrowdStatus(state.crowdStatus);
+      }
+
+      if (state.emergencyStatus) {
+        if (state.emergencyStatus.active && !emergencyActiveRef.current) {
+          setEmergencyActive(true);
+          setEmergencyData(state.emergencyStatus);
+          setActiveScreen('sos');
+          triggerHaptic();
+        } else if (!state.emergencyStatus.active && emergencyActiveRef.current) {
+          setEmergencyActive(false);
+          setEmergencyData(null);
+        }
+      }
+
+      if (Array.isArray(state.latestNotifications) && state.latestNotifications.length > 0) {
+        setNotifications(state.latestNotifications);
+      }
+
+      if (Array.isArray(state.events) && state.events.length > 0) {
+        setEvents(state.events);
+      }
+    } catch (err) {
+      console.warn('⚠️ [Heartbeat] Periodic state sync notice:', err.message);
+    }
+  }, [bandId, handlePassIssued, passStatus, triggerHaptic]);
+
+  // Gateway Switcher
+  const updateGateway = useCallback((newUrl) => {
+    iotApi.setGatewayUrl(newUrl);
+    setGatewayUrlState(iotApi.getGatewayUrl());
+    disconnectSocket();
+    syncLatestState();
+  }, [syncLatestState]);
+
+  // Periodic Gateway Health Check
+  useEffect(() => {
+    const checkHealth = async () => {
+      const res = await iotApi.pingGateway();
+      setGatewayHealth({
+        online: res.online,
+        latencyMs: res.latencyMs || 30,
+        lastChecked: new Date(),
+      });
+    };
+    checkHealth();
+    const timer = setInterval(checkHealth, 10000);
+    return () => clearInterval(timer);
+  }, [gatewayUrl]);
+
+  // Initialize Socket.IO connection & listen for events + Dynamic 3-sec Heartbeat Polling
   useEffect(() => {
     syncLatestState();
 
@@ -248,6 +304,11 @@ export const BandProvider = ({ children }) => {
       },
     });
 
+    // Dynamic Heartbeat Polling: guarantees live updates even on Vercel serverless / without WebSockets
+    const heartbeatInterval = setInterval(() => {
+      syncLatestState();
+    }, 3000);
+
     // Periodic crowd telemetry refresh (every 15 seconds)
     const crowdInterval = setInterval(async () => {
       const crowd = await iotApi.getCrowdTelemetry('somnath');
@@ -269,10 +330,11 @@ export const BandProvider = ({ children }) => {
     }, 15000);
 
     return () => {
+      clearInterval(heartbeatInterval);
       clearInterval(crowdInterval);
       disconnectSocket();
     };
-  }, [bandId, handlePassIssued, syncLatestState, triggerHaptic]);
+  }, [bandId, gatewayUrl, handlePassIssued, syncLatestState, triggerHaptic]);
 
   // Acknowledge Pass
   const acknowledgeCurrentPass = async () => {
@@ -334,16 +396,69 @@ export const BandProvider = ({ children }) => {
   // Demo Controls
   const simulatePassReceived = async () => {
     triggerHaptic();
+    const demoBooking = {
+      bookingId: `BK-SOM-${Math.floor(1000 + Math.random() * 9000)}`,
+      templeId: 'somnath',
+      templeName: 'Shree Somnath Jyotirlinga',
+      date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+      slot: '10:00 AM - 11:30 AM (Madhyahna Aarti)',
+      pilgrims: 2,
+      leadPilgrim: 'Ramesh Patel',
+      status: 'ISSUED',
+      qrPayload: JSON.stringify({
+        bookingId: `BK-SOM-DEMO`,
+        temple: 'Shree Somnath Jyotirlinga',
+        slot: '10:00 AM',
+        pilgrims: 2,
+      }),
+      issuedAt: new Date().toISOString(),
+    };
+    handlePassIssued(demoBooking);
     await iotApi.simulateEvent(bandId, 'PASS_RECEIVED');
   };
 
   const simulateCrowdAlert = async () => {
     triggerHaptic();
+    const notif = {
+      id: `notif-${Date.now()}`,
+      type: 'CROWD_ALERT',
+      title: '⚠ Crowd Alert',
+      message: 'Crowd density surging near Gate 2 turnstiles.',
+      timestamp: new Date().toISOString(),
+      read: false,
+    };
+    setNotifications((prev) => [notif, ...prev.slice(0, 14)]);
+    const nowTime = new Date().toTimeString().split(' ')[0];
+    setEvents((prev) => [
+      { id: `ev-${Date.now()}`, time: nowTime, event: 'Crowd surge at Gate 2', type: 'CROWD', timestamp: new Date().toISOString() },
+      ...prev,
+    ]);
+    setActiveScreen('crowd');
     await iotApi.simulateEvent(bandId, 'CROWD_ALERT');
   };
 
   const simulateHealthAlert = async () => {
     triggerHaptic();
+    setTelemetry((prev) => ({
+      ...prev,
+      heartRate: 104,
+      stressLevel: 'Elevated',
+    }));
+    const notif = {
+      id: `notif-${Date.now()}`,
+      type: 'HEALTH_ALERT',
+      title: '💓 Health Pulse Alert',
+      message: 'Elevated heart rate detected (104 BPM).',
+      timestamp: new Date().toISOString(),
+      read: false,
+    };
+    setNotifications((prev) => [notif, ...prev.slice(0, 14)]);
+    const nowTime = new Date().toTimeString().split(' ')[0];
+    setEvents((prev) => [
+      { id: `ev-${Date.now()}`, time: nowTime, event: 'Health surge: 104 BPM', type: 'HEALTH', timestamp: new Date().toISOString() },
+      ...prev,
+    ]);
+    setActiveScreen('vitals');
     await iotApi.simulateEvent(bandId, 'HEALTH_ALERT');
   };
 
@@ -389,6 +504,9 @@ export const BandProvider = ({ children }) => {
         simulateHealthAlert,
         simulateEmergency,
         syncLatestState,
+        gatewayUrl,
+        gatewayHealth,
+        updateGateway,
       }}
     >
       {children}
